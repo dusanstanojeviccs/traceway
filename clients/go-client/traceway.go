@@ -14,12 +14,6 @@ import (
 	"time"
 )
 
-const (
-	MaxCollectionFrames = 5
-	CollectionInterval  = time.Minute
-	UploadTimeout       = 2 * time.Second
-)
-
 func CaptureStack(skip int) []runtime.Frame {
 	const maxDepth = 64
 	pcs := make([]uintptr, maxDepth)
@@ -41,6 +35,17 @@ func CaptureStack(skip int) []runtime.Frame {
 		}
 	}
 	return result
+}
+
+func FormatRWithStack(r interface{}, frames []runtime.Frame) string {
+	var err error
+	switch v := r.(type) {
+	case error:
+		err = v
+	default:
+		err = fmt.Errorf("%v", v)
+	}
+	return FormatErrorWithStack(err, frames)
 }
 
 func FormatErrorWithStack(err error, frames []runtime.Frame) string {
@@ -84,6 +89,9 @@ type Transaction struct {
 	endpoint   string
 	duration   time.Duration
 	recordedAt time.Time
+	statusCode int
+	bodySize   int
+	clientIP   string
 }
 
 type CollectionFrame struct {
@@ -123,18 +131,36 @@ type CollectionFrameStore struct {
 	lastUploadStarted *time.Time
 
 	// Config fields
-	apiUrl string
-	token  string
-	debug  bool
+	apiUrl              string
+	token               string
+	debug               bool
+	maxCollectionFrames int
+	collectionInterval  time.Duration
+	uploadTimeout       time.Duration
 }
 
-func InitCollectionFrameStore() *CollectionFrameStore {
+func InitCollectionFrameStore(
+	apiUrl string,
+	token string,
+	debug bool,
+	maxCollectionFrames int,
+	collectionInterval time.Duration,
+	uploadTimeout time.Duration,
+) *CollectionFrameStore {
 	store := &CollectionFrameStore{
 		current:      nil,
 		currentSetAt: time.Now(),
-		sendQueue:    InitTypedRing[*CollectionFrame](5),
+		sendQueue:    InitTypedRing[*CollectionFrame](maxCollectionFrames),
 		stopCh:       make(chan struct{}),
 		messageQueue: make(chan CollectionFrameMessage),
+
+		apiUrl: apiUrl,
+		token:  token,
+		debug:  debug,
+
+		maxCollectionFrames: maxCollectionFrames,
+		collectionInterval:  collectionInterval,
+		uploadTimeout:       uploadTimeout,
 	}
 
 	store.wg.Add(1)
@@ -146,7 +172,7 @@ func InitCollectionFrameStore() *CollectionFrameStore {
 func (s *CollectionFrameStore) process() {
 	defer s.wg.Done()
 
-	rotationTicker := time.NewTicker(CollectionInterval)
+	rotationTicker := time.NewTicker(s.collectionInterval)
 	defer rotationTicker.Stop()
 
 	for {
@@ -155,7 +181,7 @@ func (s *CollectionFrameStore) process() {
 			return
 		case <-rotationTicker.C:
 			if s.current != nil {
-				if s.currentSetAt.Before(time.Now().Add(-CollectionInterval)) {
+				if s.currentSetAt.Before(time.Now().Add(-s.collectionInterval)) {
 					s.rotateCurrentCollectionFrame()
 					s.processSendQueue()
 				}
@@ -186,7 +212,7 @@ func (s *CollectionFrameStore) rotateCurrentCollectionFrame() {
 }
 func (s *CollectionFrameStore) processSendQueue() {
 	// we are triggering an upload - we need to make sure no other uploads are going on
-	if s.lastUploadStarted == nil || s.lastUploadStarted.Before(time.Now().Add(UploadTimeout)) {
+	if s.lastUploadStarted == nil || s.lastUploadStarted.Before(time.Now().Add(s.uploadTimeout)) {
 		now := time.Now()
 		s.lastUploadStarted = &now
 		go s.triggerUpload(s.sendQueue.ReadAll())
@@ -233,7 +259,68 @@ func (s *CollectionFrameStore) triggerUpload(framesToSend []*CollectionFrame) {
 	defer resp.Body.Close()
 }
 
-var collectionFrameStore = InitCollectionFrameStore()
+var collectionFrameStore *CollectionFrameStore
+
+type TracewayOptions struct {
+	debug               bool
+	maxCollectionFrames int
+	collectionInterval  time.Duration
+	uploadTimeout       time.Duration
+}
+
+func NewTracewayOptions(options ...func(*TracewayOptions)) *TracewayOptions {
+	svr := &TracewayOptions{
+		maxCollectionFrames: 5,
+		collectionInterval:  time.Minute,
+		uploadTimeout:       2 * time.Second,
+	}
+	for _, o := range options {
+		o(svr)
+	}
+	return svr
+}
+func WithDebug(val bool) func(*TracewayOptions) {
+	return func(s *TracewayOptions) {
+		s.debug = val
+	}
+}
+func WithMaxCollectionFrames(val int) func(*TracewayOptions) {
+	return func(s *TracewayOptions) {
+		s.maxCollectionFrames = val
+	}
+}
+func WithCollectionInterval(val time.Duration) func(*TracewayOptions) {
+	return func(s *TracewayOptions) {
+		s.collectionInterval = val
+	}
+}
+func WithUploadTimeout(val time.Duration) func(*TracewayOptions) {
+	return func(s *TracewayOptions) {
+		s.uploadTimeout = val
+	}
+}
+
+func Init(connectionString string, options ...func(*TracewayOptions)) error {
+	if collectionFrameStore != nil {
+		return fmt.Errorf("Second Traceway initialization detected")
+	}
+	connParts := strings.Split(connectionString, "@")
+
+	token := connParts[0]
+	apiUrl := connParts[1]
+
+	tracewayOptions := NewTracewayOptions(options...)
+
+	collectionFrameStore = InitCollectionFrameStore(
+		apiUrl,
+		token,
+		tracewayOptions.debug,
+		tracewayOptions.maxCollectionFrames,
+		tracewayOptions.collectionInterval,
+		tracewayOptions.uploadTimeout,
+	)
+	return nil
+}
 
 func CaptureMetric(name string, value float32) {
 	collectionFrameStore.messageQueue <- CollectionFrameMessage{
@@ -242,6 +329,38 @@ func CaptureMetric(name string, value float32) {
 			name:       name,
 			value:      value,
 			recordedAt: time.Now(),
+		},
+	}
+}
+
+func CaptureTransaction(
+	transactionId string,
+	endpoint string,
+	d time.Duration,
+	startedAt time.Time,
+	statusCode, bodySize int,
+	clientIP string,
+) {
+	collectionFrameStore.messageQueue <- CollectionFrameMessage{
+		msgType: CollectionFrameMessageTypeTransaction,
+		transaction: &Transaction{
+			id:         transactionId, // for regular recover we don't need a transaction
+			endpoint:   endpoint,
+			duration:   d,
+			recordedAt: startedAt,
+			statusCode: statusCode,
+			bodySize:   bodySize,
+			clientIP:   clientIP,
+		},
+	}
+}
+func CaptureTransactionException(transactionId string, stacktrace string) {
+	collectionFrameStore.messageQueue <- CollectionFrameMessage{
+		msgType: CollectionFrameMessageTypeException,
+		exceptionStackTrace: &ExceptionStackTrace{
+			transactionId: &transactionId,
+			stackTrace:    stacktrace,
+			recordedAt:    time.Now(),
 		},
 	}
 }
@@ -260,18 +379,11 @@ func Recover() {
 	r := recover()
 
 	if r != nil {
-		var err error
-		switch v := r.(type) {
-		case error:
-			err = v
-		default:
-			err = fmt.Errorf("%v", v)
-		}
 		collectionFrameStore.messageQueue <- CollectionFrameMessage{
 			msgType: CollectionFrameMessageTypeException,
 			exceptionStackTrace: &ExceptionStackTrace{
 				transactionId: nil, // for regular recover we don't need a transaction
-				stackTrace:    FormatErrorWithStack(err, CaptureStack(2)),
+				stackTrace:    FormatRWithStack(r, CaptureStack(2)),
 				recordedAt:    time.Now(),
 			},
 		}
