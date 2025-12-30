@@ -7,3 +7,8 @@ type MetricRecord struct {
 	Value      float32   `json:"value" ch:"value"`
 	RecordedAt time.Time `json:"recordedAt" ch:"recorded_at"`
 }
+
+const (
+	MetricNameMemoryUsage = "memory_usage"
+	MetricNameCpuUsage    = "cpu_usage"
+)

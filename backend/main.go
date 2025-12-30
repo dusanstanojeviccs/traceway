@@ -4,6 +4,7 @@ import (
 	"backend/app/chdb"
 	"backend/app/controllers"
 	"backend/app/middleware"
+	"backend/app/migrations"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +17,15 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	chdb.Init()
+	err = chdb.Init()
+	if err != nil {
+		panic(err)
+	}
+
+	err = migrations.Run()
+	if err != nil {
+		panic(err)
+	}
 
 	middleware.InitUseClientAuth()
 

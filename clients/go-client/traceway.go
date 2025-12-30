@@ -109,13 +109,15 @@ const (
 	CollectionFrameMessageTypeException   = 0
 	CollectionFrameMessageTypeMetric      = 1
 	CollectionFrameMessageTypeTransaction = 2
+	CollectionFrameMessageTypeClearFrames = 3
 )
 
 type CollectionFrameMessage struct {
-	msgType             collectionFrameMessageType
-	exceptionStackTrace *ExceptionStackTrace
-	metric              *MetricsRecord
-	transaction         *Transaction
+	msgType                  collectionFrameMessageType
+	exceptionStackTrace      *ExceptionStackTrace
+	metric                   *MetricsRecord
+	transaction              *Transaction
+	collectionFramesToRemove []*CollectionFrame
 }
 
 type CollectionFrameStore struct {
@@ -185,18 +187,20 @@ func (s *CollectionFrameStore) process() {
 		case <-s.stopCh:
 			return
 		case <-rotationTicker.C:
-			fmt.Println("TRIGGERING THE rotationTicker.C")
 			if s.current != nil {
 				if s.currentSetAt.Before(time.Now().Add(-s.collectionInterval)) {
-					fmt.Println("ROTATING AND PROCESSING")
 					s.rotateCurrentCollectionFrame()
 					s.processSendQueue()
 				}
 			} else if s.sendQueue.len > 0 {
-				fmt.Println("PROCESSING SEND QUEUE")
 				s.processSendQueue()
 			}
 		case msg := <-s.messageQueue:
+			if msg.msgType == CollectionFrameMessageTypeClearFrames {
+				s.sendQueue.Remove(msg.collectionFramesToRemove)
+				continue
+			}
+
 			if s.current == nil {
 				// we need to start a new frame
 				s.current = &CollectionFrame{}
@@ -219,10 +223,8 @@ func (s *CollectionFrameStore) rotateCurrentCollectionFrame() {
 	s.current = nil
 }
 func (s *CollectionFrameStore) processSendQueue() {
-	fmt.Println("processSendQueue")
 	// we are triggering an upload - we need to make sure no other uploads are going on
 	if s.lastUploadStarted == nil || s.lastUploadStarted.Before(time.Now().Add(s.uploadTimeout)) {
-		fmt.Println("ABOUT TO TRIGGER THE UPLOAD")
 		now := time.Now()
 		s.lastUploadStarted = &now
 		go s.triggerUpload(s.sendQueue.ReadAll())
@@ -231,7 +233,6 @@ func (s *CollectionFrameStore) processSendQueue() {
 
 // Report adds an exception event to the current envelope
 func (s *CollectionFrameStore) triggerUpload(framesToSend []*CollectionFrame) {
-	fmt.Println("TRIGGER UPLOAD STARTED")
 	defer func() {
 		if r := recover(); s.debug && r != nil {
 			log.Print("Traceway: failed to upload the CollectionFrame")
@@ -241,8 +242,8 @@ func (s *CollectionFrameStore) triggerUpload(framesToSend []*CollectionFrame) {
 	}()
 
 	jsonData, err := json.Marshal(gin.H{
-		"app":    s.app,
-		"frames": framesToSend,
+		"app":              s.app,
+		"collectionFrames": framesToSend,
 	})
 	if err != nil {
 		if s.debug {
@@ -250,8 +251,6 @@ func (s *CollectionFrameStore) triggerUpload(framesToSend []*CollectionFrame) {
 		}
 		return
 	}
-
-	fmt.Println("SENDING POST TO ", s.apiUrl, string(jsonData))
 
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
@@ -290,7 +289,13 @@ func (s *CollectionFrameStore) triggerUpload(framesToSend []*CollectionFrame) {
 	}
 	defer resp.Body.Close()
 
-	fmt.Println("RESPONDED WITH", resp.StatusCode)
+	if resp.StatusCode == 200 {
+		// we need to clear out the frames
+		s.messageQueue <- CollectionFrameMessage{
+			msgType:                  CollectionFrameMessageTypeClearFrames,
+			collectionFramesToRemove: framesToSend,
+		}
+	}
 }
 
 var collectionFrameStore *CollectionFrameStore

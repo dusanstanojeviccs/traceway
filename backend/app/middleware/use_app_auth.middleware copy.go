@@ -10,7 +10,7 @@ import (
 var UseAppAuth func(c *gin.Context)
 
 func InitUseAppAuth() {
-	authHeader := "Bearer " + os.Getenv("TOKEN")
+	authHeader := "Bearer " + os.Getenv("APP_TOKEN")
 
 	UseAppAuth = func(c *gin.Context) {
 		if authHeader != c.GetHeader("Authorization") {

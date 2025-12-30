@@ -4,6 +4,7 @@ import (
 	"backend/app/chdb"
 	"backend/app/models"
 	"context"
+	"time"
 )
 
 type metricRecordRepository struct{}
@@ -19,6 +20,12 @@ func (e *metricRecordRepository) InsertAsync(ctx context.Context, lines []models
 		}
 	}
 	return batch.Send()
+}
+
+func (e *metricRecordRepository) GetAverageBetween(ctx context.Context, name string, start, end time.Time) (float64, error) {
+	var avg float64
+	err := (*chdb.Conn).QueryRow(ctx, "SELECT coalesce(avg(value), 0) FROM metric_records WHERE name = ? AND recorded_at >= ? AND recorded_at <= ?", name, start, end).Scan(&avg)
+	return avg, err
 }
 
 var MetricRecordRepository = metricRecordRepository{}
