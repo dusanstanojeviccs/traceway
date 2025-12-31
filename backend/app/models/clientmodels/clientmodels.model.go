@@ -22,7 +22,7 @@ func (c *ClientExceptionStackTrace) ToExceptionStackTrace(exceptionHash string) 
 
 type ClientMetricRecord struct {
 	Name       string    `json:"name"`
-	Value      float32   `json:"value"`
+	Value      float64   `json:"value"`
 	RecordedAt time.Time `json:"recordedAt"`
 }
 

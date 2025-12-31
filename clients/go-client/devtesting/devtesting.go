@@ -12,6 +12,7 @@ func main() {
 }
 
 func testGin() {
+
 	router := gin.Default()
 
 	router.Use(tracewaygin.New(
@@ -22,6 +23,23 @@ func testGin() {
 
 	router.GET("/test-exception", func(ctx *gin.Context) {
 		panic("Cool")
+	})
+
+	router.GET("/test-ok", func(ctx *gin.Context) {
+		ctx.JSON(200, gin.H{
+			"status": "ok",
+		})
+	})
+	router.GET("/test-not-found", func(ctx *gin.Context) {
+		ctx.JSON(404, gin.H{
+			"status": "not-found",
+		})
+	})
+
+	router.GET("/test-param/:param", func(ctx *gin.Context) {
+		ctx.JSON(200, gin.H{
+			"param": ctx.Param("param"),
+		})
 	})
 
 	router.GET("/metrics", func(ctx *gin.Context) {

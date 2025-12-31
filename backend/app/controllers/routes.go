@@ -31,4 +31,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 
 	router.POST("/transactions", middleware.UseAppAuth, middleware.UseGzip, TransactionController.FindAllTransactions)
 	router.POST("/exception-stack-traces", middleware.UseAppAuth, middleware.UseGzip, ExceptionStackTraceController.FindGrouppedExceptionStackTraces)
+
+	// Auth
+	router.POST("/login", AuthController.Login)
 }

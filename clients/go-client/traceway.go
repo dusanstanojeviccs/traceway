@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"traceway/metrics/cpu"
+	"traceway/metrics/mem"
 
 	"github.com/gin-gonic/gin"
 )
@@ -81,9 +83,9 @@ type ExceptionStackTrace struct {
 	RecordedAt    time.Time `json:"recordedAt"`
 }
 
-type MetricsRecord struct {
+type MetricRecord struct {
 	Name       string    `json:"name"`
-	Value      float32   `json:"value"`
+	Value      float64   `json:"value"`
 	RecordedAt time.Time `json:"recordedAt"`
 }
 
@@ -99,7 +101,7 @@ type Transaction struct {
 
 type CollectionFrame struct {
 	StackTraces  []*ExceptionStackTrace `json:"stackTraces"`
-	Metrics      []*MetricsRecord       `json:"metrics"`
+	Metrics      []*MetricRecord        `json:"metrics"`
 	Transactions []*Transaction         `json:"transactions"`
 }
 
@@ -115,7 +117,7 @@ const (
 type CollectionFrameMessage struct {
 	msgType                  collectionFrameMessageType
 	exceptionStackTrace      *ExceptionStackTrace
-	metric                   *MetricsRecord
+	metric                   *MetricRecord
 	transaction              *Transaction
 	collectionFramesToRemove []*CollectionFrame
 }
@@ -142,6 +144,7 @@ type CollectionFrameStore struct {
 	maxCollectionFrames int
 	collectionInterval  time.Duration
 	uploadTimeout       time.Duration
+	metricsInterval     time.Duration
 }
 
 func InitCollectionFrameStore(
@@ -152,6 +155,7 @@ func InitCollectionFrameStore(
 	maxCollectionFrames int,
 	collectionInterval time.Duration,
 	uploadTimeout time.Duration,
+	metricsInterval time.Duration,
 ) *CollectionFrameStore {
 	store := &CollectionFrameStore{
 		current:      nil,
@@ -168,14 +172,72 @@ func InitCollectionFrameStore(
 		maxCollectionFrames: maxCollectionFrames,
 		collectionInterval:  collectionInterval,
 		uploadTimeout:       uploadTimeout,
+		metricsInterval:     metricsInterval,
 	}
 
 	store.wg.Add(1)
 	go store.process()
+	go store.processMetrics()
 
 	return store
 }
 
+const (
+	MetricNameMemoryUsage     = "mem.used"
+	MetricNameMemoryUsagePcnt = "mem.used_pcnt"
+	MetricNameCpuUsage        = "cpu.used_pcnt"
+	MetricNameGoRoutines      = "go.go_routines"
+	MetricNameHeapObjects     = "go.heap_objects"
+	MetricNameNumGC           = "go.num_gc"
+	MetricNameGCPauseTotal    = "go.gc_pause"
+)
+
+func (s *CollectionFrameStore) processMetrics() {
+	metricsTicker := time.NewTicker(s.metricsInterval)
+	defer metricsTicker.Stop()
+
+	for {
+		select {
+		case <-s.stopCh:
+			return
+		case <-metricsTicker.C:
+			s.safeProcessMetrics()
+		}
+	}
+}
+
+func (s *CollectionFrameStore) safeProcessMetrics() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Print("Traceway: failed to get metrics data")
+		}
+	}()
+	cpuPercent, err := cpu.GetCpuPercent(time.Second)
+	if err == nil {
+		CaptureMetric(MetricNameCpuUsage, cpuPercent)
+	} else {
+		if s.debug {
+			log.Println("Traceway cpu not read", err)
+		}
+	}
+
+	memPercent, err := mem.GetMemoryUsedPercent()
+	if err == nil {
+		CaptureMetric(MetricNameMemoryUsagePcnt, memPercent)
+	} else {
+		if s.debug {
+			log.Println("Traceway mem not read", err)
+		}
+	}
+
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	CaptureMetric(MetricNameMemoryUsage, float64(m.Alloc)/1024/1024)
+	CaptureMetric(MetricNameGoRoutines, float64(runtime.NumGoroutine()))
+	CaptureMetric(MetricNameHeapObjects, float64(m.HeapObjects))
+	CaptureMetric(MetricNameNumGC, float64(m.NumGC))
+	CaptureMetric(MetricNameGCPauseTotal, float64(m.PauseTotalNs))
+}
 func (s *CollectionFrameStore) process() {
 	defer s.wg.Done()
 
@@ -320,6 +382,7 @@ type TracewayOptions struct {
 	maxCollectionFrames int
 	collectionInterval  time.Duration
 	uploadTimeout       time.Duration
+	metricsInterval     time.Duration
 }
 
 func NewTracewayOptions(options ...func(*TracewayOptions)) *TracewayOptions {
@@ -327,6 +390,7 @@ func NewTracewayOptions(options ...func(*TracewayOptions)) *TracewayOptions {
 		maxCollectionFrames: 12,
 		collectionInterval:  5 * time.Second,
 		uploadTimeout:       2 * time.Second,
+		metricsInterval:     30 * time.Second,
 	}
 	for _, o := range options {
 		o(svr)
@@ -353,6 +417,11 @@ func WithUploadTimeout(val time.Duration) func(*TracewayOptions) {
 		s.uploadTimeout = val
 	}
 }
+func WithMetricsInterval(val time.Duration) func(*TracewayOptions) {
+	return func(s *TracewayOptions) {
+		s.collectionInterval = val
+	}
+}
 
 func Init(app, connectionString string, options ...func(*TracewayOptions)) error {
 	if collectionFrameStore != nil {
@@ -373,14 +442,15 @@ func Init(app, connectionString string, options ...func(*TracewayOptions)) error
 		tracewayOptions.maxCollectionFrames,
 		tracewayOptions.collectionInterval,
 		tracewayOptions.uploadTimeout,
+		tracewayOptions.metricsInterval,
 	)
 	return nil
 }
 
-func CaptureMetric(name string, value float32) {
+func CaptureMetric(name string, value float64) {
 	collectionFrameStore.messageQueue <- CollectionFrameMessage{
 		msgType: CollectionFrameMessageTypeMetric,
-		metric: &MetricsRecord{
+		metric: &MetricRecord{
 			Name:       name,
 			Value:      value,
 			RecordedAt: time.Now(),

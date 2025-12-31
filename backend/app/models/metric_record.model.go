@@ -4,11 +4,17 @@ import "time"
 
 type MetricRecord struct {
 	Name       string    `json:"name" ch:"name"`
-	Value      float32   `json:"value" ch:"value"`
+	Value      float64   `json:"value" ch:"value"`
 	RecordedAt time.Time `json:"recordedAt" ch:"recorded_at"`
 }
 
 const (
-	MetricNameMemoryUsage = "memory_usage"
-	MetricNameCpuUsage    = "cpu_usage"
+	MetricNameMemoryUsage     = "mem.used"
+	MetricNameMemoryUsagePcnt = "mem.used_pcnt"
+	MetricNameCpuUsage        = "cpu.used_pcnt"
+	MetricNameGoRoutines      = "go.go_routines"
+	MetricNameHeapObjects     = "go.heap_objects"
+	MetricNameNumGC           = "go.num_gc"
+	MetricNameGCPauseTotal    = "go.gc_pause"
+	// other metric names are custom and added by the clients
 )
