@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import { api } from '$lib/api';
     import * as Table from "$lib/components/ui/table";
     import { Input } from "$lib/components/ui/input";
@@ -54,11 +55,12 @@
             const requestBody = {
                 fromDate: fromDate.toISOString(),
                 toDate: now.toISOString(),
-                orderBy: 'last_seen DESC', // Default sort
+                orderBy: 'last_seen',
                 pagination: {
                     page: page,
                     pageSize: pageSize
-                }
+                },
+                search: searchQuery.trim()
             };
 
             const response = await api.post('/exception-stack-traces', requestBody);
@@ -93,6 +95,21 @@
         page = 1; // Reset to first page when changing page size
         loadData();
     }
+
+    // Debounce search input
+    let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    function handleSearchInput() {
+        if (searchTimeout) clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            page = 1; // Reset to page 1 on new search
+            loadData();
+        }, 300);
+    }
+
+    onMount(() => {
+        loadData();
+    });
 </script>
 
 <div class="space-y-4">
@@ -105,9 +122,8 @@
             placeholder="Search exceptions..."
             class="h-8 w-[150px] lg:w-[250px]"
             bind:value={searchQuery}
-            disabled
+            oninput={handleSearchInput}
         />
-        <!-- Note: Search disabled as backend implementation pending -->
 
         <!-- <Select.Root
             onOpenChangeComplete={(v) => {

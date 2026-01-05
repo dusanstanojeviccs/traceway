@@ -3,6 +3,7 @@ package controllers
 import (
 	"backend/app/models"
 	"backend/app/repositories"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -16,6 +17,7 @@ type ExceptionSearchRequest struct {
 	ToDate     time.Time        `json:"toDate"`
 	OrderBy    string           `json:"orderBy"`
 	Pagination PaginationParams `json:"pagination"`
+	Search     string           `json:"search"`
 }
 
 func (e exceptionStackTraceController) FindGrouppedExceptionStackTraces(c *gin.Context) {
@@ -25,7 +27,7 @@ func (e exceptionStackTraceController) FindGrouppedExceptionStackTraces(c *gin.C
 		return
 	}
 
-	exceptions, total, err := repositories.ExceptionStackTraceRepository.FindGrouped(c, request.FromDate, request.ToDate, request.Pagination.Page, request.Pagination.PageSize, request.OrderBy)
+	exceptions, total, err := repositories.ExceptionStackTraceRepository.FindGrouped(c, request.FromDate, request.ToDate, request.Pagination.Page, request.Pagination.PageSize, request.OrderBy, request.Search)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

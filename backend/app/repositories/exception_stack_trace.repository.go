@@ -28,14 +28,7 @@ func (e *exceptionStackTraceRepository) CountBetween(ctx context.Context, start,
 	return int64(count), err
 }
 
-func (e *exceptionStackTraceRepository) FindGrouped(ctx context.Context, fromDate, toDate time.Time, page, pageSize int, orderBy string) ([]models.ExceptionGroup, int64, error) {
-	// Count unique hashes
-	var count uint64
-	err := (*chdb.Conn).QueryRow(ctx, "SELECT uniq(exception_hash) FROM exception_stack_traces WHERE recorded_at >= ? AND recorded_at <= ?", fromDate, toDate).Scan(&count)
-	if err != nil {
-		return nil, 0, err
-	}
-
+func (e *exceptionStackTraceRepository) FindGrouped(ctx context.Context, fromDate, toDate time.Time, page, pageSize int, orderBy string, search string) ([]models.ExceptionGroup, int64, error) {
 	offset := (page - 1) * pageSize
 
 	allowedOrderBy := map[string]bool{
@@ -48,10 +41,28 @@ func (e *exceptionStackTraceRepository) FindGrouped(ctx context.Context, fromDat
 		orderBy = "count"
 	}
 
-	// Re-writing query string construction for OrderBy to avoid binding issue
-	fullQuery := "SELECT exception_hash, any(stack_trace), max(recorded_at) as last_seen, min(recorded_at) as first_seen, count() as count FROM exception_stack_traces WHERE recorded_at >= ? AND recorded_at <= ? GROUP BY exception_hash ORDER BY " + orderBy + " DESC LIMIT ? OFFSET ?"
+	// Build WHERE clause dynamically based on search
+	whereClause := "recorded_at >= ? AND recorded_at <= ?"
+	args := []interface{}{fromDate, toDate}
 
-	rows, err := (*chdb.Conn).Query(ctx, fullQuery, fromDate, toDate, pageSize, offset)
+	if search != "" {
+		whereClause += " AND positionCaseInsensitive(stack_trace, ?) > 0"
+		args = append(args, search)
+	}
+
+	// Count unique hashes with search filter
+	countQuery := "SELECT uniq(exception_hash) FROM exception_stack_traces WHERE " + whereClause
+	var count uint64
+	err := (*chdb.Conn).QueryRow(ctx, countQuery, args...).Scan(&count)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Main query with search filter
+	fullQuery := "SELECT exception_hash, any(stack_trace), max(recorded_at) as last_seen, min(recorded_at) as first_seen, count() as count FROM exception_stack_traces WHERE " + whereClause + " GROUP BY exception_hash ORDER BY " + orderBy + " DESC LIMIT ? OFFSET ?"
+
+	queryArgs := append(args, pageSize, offset)
+	rows, err := (*chdb.Conn).Query(ctx, fullQuery, queryArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
