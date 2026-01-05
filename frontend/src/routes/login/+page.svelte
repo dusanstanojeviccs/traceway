@@ -32,7 +32,7 @@
 
             // If successful, store token (store handles localStorage)
             authState.setToken(appToken);
-            goto('/issues');
+            goto('/');
         } catch (e) {
             error = 'Invalid APP_TOKEN';
         } finally {
