@@ -77,6 +77,19 @@
         new CalendarDateTime(toDate.year, toDate.month, toDate.day, 23, 59, 59)
     );
 
+    // Track initial values when popover opens to detect changes
+    let initialFromDateTime = $state<CalendarDateTime | null>(null);
+    let initialToDateTime = $state<CalendarDateTime | null>(null);
+
+    // Helper to compare two CalendarDateTime values
+    function dateTimesEqual(a: CalendarDateTime, b: CalendarDateTime): boolean {
+        return a.year === b.year &&
+               a.month === b.month &&
+               a.day === b.day &&
+               a.hour === b.hour &&
+               a.minute === b.minute;
+    }
+
     // Get display label for trigger button
     const displayLabel = $derived(() => {
         if (selectedPreset && !showCustom) {
@@ -160,13 +173,29 @@
     }
 
     function handleOpenChange(open: boolean) {
-        // Auto-apply when closing (both presets and custom)
-        if (!open) {
-            fromDate = new CalendarDate(tempFromDateTime.year, tempFromDateTime.month, tempFromDateTime.day);
-            toDate = new CalendarDate(tempToDateTime.year, tempToDateTime.month, tempToDateTime.day);
-            fromTime = `${String(tempFromDateTime.hour).padStart(2, '0')}:${String(tempFromDateTime.minute).padStart(2, '0')}`;
-            toTime = `${String(tempToDateTime.hour).padStart(2, '0')}:${String(tempToDateTime.minute).padStart(2, '0')}`;
-            onApply?.({ date: fromDate, time: fromTime }, { date: toDate, time: toTime });
+        if (open) {
+            // Capture initial values when opening
+            initialFromDateTime = new CalendarDateTime(
+                tempFromDateTime.year, tempFromDateTime.month, tempFromDateTime.day,
+                tempFromDateTime.hour, tempFromDateTime.minute, tempFromDateTime.second
+            );
+            initialToDateTime = new CalendarDateTime(
+                tempToDateTime.year, tempToDateTime.month, tempToDateTime.day,
+                tempToDateTime.hour, tempToDateTime.minute, tempToDateTime.second
+            );
+        } else {
+            // Only apply if values have changed
+            const hasChanged = !initialFromDateTime || !initialToDateTime ||
+                !dateTimesEqual(tempFromDateTime, initialFromDateTime) ||
+                !dateTimesEqual(tempToDateTime, initialToDateTime);
+
+            if (hasChanged) {
+                fromDate = new CalendarDate(tempFromDateTime.year, tempFromDateTime.month, tempFromDateTime.day);
+                toDate = new CalendarDate(tempToDateTime.year, tempToDateTime.month, tempToDateTime.day);
+                fromTime = `${String(tempFromDateTime.hour).padStart(2, '0')}:${String(tempFromDateTime.minute).padStart(2, '0')}`;
+                toTime = `${String(tempToDateTime.hour).padStart(2, '0')}:${String(tempToDateTime.minute).padStart(2, '0')}`;
+                onApply?.({ date: fromDate, time: fromTime }, { date: toDate, time: toTime });
+            }
 
             // Keep showCustom state (don't reset it) so it remembers custom mode
             fromPickerOpen = false;

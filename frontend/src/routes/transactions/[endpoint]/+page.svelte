@@ -5,9 +5,9 @@
     import * as Table from "$lib/components/ui/table";
     import { Button } from "$lib/components/ui/button";
     import { Skeleton } from "$lib/components/ui/skeleton";
-    import { Input } from "$lib/components/ui/input";
-    import { Label } from "$lib/components/ui/label";
+    import { TimeRangePicker } from "$lib/components/ui/time-range-picker";
     import { ArrowLeft, ArrowUpDown, ArrowDown } from "@lucide/svelte";
+    import { CalendarDate, getLocalTimeZone, today } from "@internationalized/date";
     import { ErrorDisplay } from "$lib/components/ui/error-display";
     import { projectsState } from '$lib/state/projects.svelte';
 
@@ -37,34 +37,33 @@
     let total = $state(0);
     let totalPages = $state(0);
 
-    // Date Range State (separate date and time)
-    let fromDateValue = $state('');
-    let fromTimeValue = $state('');
-    let toDateValue = $state('');
-    let toTimeValue = $state('');
+    // Date Range State
+    let fromDate = $state<CalendarDate>(today(getLocalTimeZone()).subtract({ days: 7 }));
+    let toDate = $state<CalendarDate>(today(getLocalTimeZone()));
+    let fromTime = $state('00:00');
+    let toTime = $state('23:59');
 
     // Sorting State
     let orderBy = $state<SortField>('recorded_at');
 
     // Combine date and time into ISO datetime string
     function getFromDateTime(): string {
-        if (!fromDateValue) return '';
-        return `${fromDateValue}T${fromTimeValue || '00:00'}`;
+        const dateStr = `${fromDate.year}-${String(fromDate.month).padStart(2, '0')}-${String(fromDate.day).padStart(2, '0')}`;
+        return `${dateStr}T${fromTime || '00:00'}`;
     }
 
     function getToDateTime(): string {
-        if (!toDateValue) return '';
-        return `${toDateValue}T${toTimeValue || '23:59'}`;
+        const dateStr = `${toDate.year}-${String(toDate.month).padStart(2, '0')}-${String(toDate.day).padStart(2, '0')}`;
+        return `${dateStr}T${toTime || '23:59'}`;
     }
 
-    // Parse datetime string into date and time parts
-    function parseDateTimeParts(dateTimeStr: string): { date: string; time: string } {
-        if (!dateTimeStr) return { date: '', time: '' };
-        const parts = dateTimeStr.split('T');
-        return {
-            date: parts[0] || '',
-            time: parts[1] || '00:00'
-        };
+    function handleTimeRangeChange(from: { date: CalendarDate; time: string }, to: { date: CalendarDate; time: string }) {
+        fromDate = from.date;
+        fromTime = from.time;
+        toDate = to.date;
+        toTime = to.time;
+        page = 1;
+        loadData();
     }
 
     function formatDuration(nanoseconds: number): string {
@@ -153,21 +152,23 @@
     }
 
     onMount(() => {
-        // Initialize dates from URL params or default to last 7 days
+        // Initialize dates from URL params or use defaults (already set in state)
         if (data.from && data.to) {
-            const fromParts = parseDateTimeParts(data.from);
-            const toParts = parseDateTimeParts(data.to);
-            fromDateValue = fromParts.date;
-            fromTimeValue = fromParts.time;
-            toDateValue = toParts.date;
-            toTimeValue = toParts.time;
-        } else {
-            const now = new Date();
-            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            toDateValue = now.toISOString().slice(0, 10);
-            toTimeValue = now.toTimeString().slice(0, 5);
-            fromDateValue = sevenDaysAgo.toISOString().slice(0, 10);
-            fromTimeValue = sevenDaysAgo.toTimeString().slice(0, 5);
+            // Parse from URL params: "YYYY-MM-DDTHH:MM"
+            const fromParts = data.from.split('T');
+            const toParts = data.to.split('T');
+
+            if (fromParts[0]) {
+                const [year, month, day] = fromParts[0].split('-').map(Number);
+                fromDate = new CalendarDate(year, month, day);
+                fromTime = fromParts[1] || '00:00';
+            }
+
+            if (toParts[0]) {
+                const [year, month, day] = toParts[0].split('-').map(Number);
+                toDate = new CalendarDate(year, month, day);
+                toTime = toParts[1] || '23:59';
+            }
         }
         loadData();
     });
@@ -194,57 +195,24 @@
             onRetry={() => loadData()}
         />
     {:else}
-    <div class="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onclick={goBack} class="h-8 w-8 p-0">
-            <ArrowLeft class="h-4 w-4" />
-        </Button>
-        <div>
-            <h2 class="text-2xl font-bold tracking-tight font-mono">{decodeURIComponent(data.endpoint)}</h2>
-            <p class="text-sm text-muted-foreground">Transaction instances for this endpoint</p>
+    <!-- Header with Title and Time Range Filter -->
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onclick={goBack} class="h-8 w-8 p-0">
+                <ArrowLeft class="h-4 w-4" />
+            </Button>
+            <div>
+                <h2 class="text-2xl font-bold tracking-tight font-mono">{decodeURIComponent(data.endpoint)}</h2>
+                <p class="text-sm text-muted-foreground">Transaction instances for this endpoint</p>
+            </div>
         </div>
-    </div>
-
-    <!-- Date Range Filters -->
-    <div class="flex flex-wrap items-end gap-4 p-4 rounded-lg border bg-card">
-        <div class="flex flex-col gap-1.5">
-            <Label for="from-date" class="text-xs text-muted-foreground">From Date</Label>
-            <Input
-                id="from-date"
-                type="date"
-                class="h-9 w-[150px]"
-                bind:value={fromDateValue}
-            />
-        </div>
-        <div class="flex flex-col gap-1.5">
-            <Label for="from-time" class="text-xs text-muted-foreground">From Time</Label>
-            <Input
-                id="from-time"
-                type="time"
-                class="h-9 w-[120px]"
-                bind:value={fromTimeValue}
-            />
-        </div>
-        <div class="flex flex-col gap-1.5">
-            <Label for="to-date" class="text-xs text-muted-foreground">To Date</Label>
-            <Input
-                id="to-date"
-                type="date"
-                class="h-9 w-[150px]"
-                bind:value={toDateValue}
-            />
-        </div>
-        <div class="flex flex-col gap-1.5">
-            <Label for="to-time" class="text-xs text-muted-foreground">To Time</Label>
-            <Input
-                id="to-time"
-                type="time"
-                class="h-9 w-[120px]"
-                bind:value={toTimeValue}
-            />
-        </div>
-        <Button variant="default" size="sm" onclick={loadData} class="h-9">
-            Go
-        </Button>
+        <TimeRangePicker
+            bind:fromDate
+            bind:toDate
+            bind:fromTime
+            bind:toTime
+            onApply={handleTimeRangeChange}
+        />
     </div>
 
     <!-- Transactions Table -->
