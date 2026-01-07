@@ -4,7 +4,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Table from '$lib/components/ui/table';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { ArrowRight, CircleHelp, Gauge, Bug } from 'lucide-svelte';
+	import { ArrowRight, Info, Gauge, Bug, CircleQuestionMark } from 'lucide-svelte';
 	import { api } from '$lib/api';
 	import { ErrorDisplay } from '$lib/components/ui/error-display';
 	import { projectsState } from '$lib/state/projects.svelte';
@@ -139,6 +139,15 @@
 					<Gauge class="h-5 w-5 text-chart-1" />
 				</div>
 				<h2 class="text-2xl font-bold tracking-tight">Endpoints</h2>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+
+						<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
+					</Tooltip.Trigger>
+					<Tooltip.Content>
+						<p>Most impactful endpoints to optimize based on traffic and response time variance</p>
+					</Tooltip.Content>
+				</Tooltip.Root>
 			</div>
 			<div class="rounded-md border overflow-hidden">
 				<Table.Root>
@@ -149,7 +158,7 @@
 									Endpoint
 									<Tooltip.Root>
 										<Tooltip.Trigger>
-											<CircleHelp class="h-3.5 w-3.5 text-muted-foreground/60" />
+											<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
 										</Tooltip.Trigger>
 										<Tooltip.Content>
 											<p class="text-xs">The API route or page being accessed</p>
@@ -162,7 +171,7 @@
 									Calls
 									<Tooltip.Root>
 										<Tooltip.Trigger>
-											<CircleHelp class="h-3.5 w-3.5 text-muted-foreground/60" />
+											<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
 										</Tooltip.Trigger>
 										<Tooltip.Content>
 											<p class="text-xs">Total number of requests</p>
@@ -175,7 +184,7 @@
 									Typical
 									<Tooltip.Root>
 										<Tooltip.Trigger>
-											<CircleHelp class="h-3.5 w-3.5 text-muted-foreground/60" />
+											<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
 										</Tooltip.Trigger>
 										<Tooltip.Content>
 											<p class="text-xs">Median response time (P50)</p>
@@ -188,7 +197,7 @@
 									Slow
 									<Tooltip.Root>
 										<Tooltip.Trigger>
-											<CircleHelp class="h-3.5 w-3.5 text-muted-foreground/60" />
+											<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
 										</Tooltip.Trigger>
 										<Tooltip.Content>
 											<p class="text-xs">95th percentile - slowest 5%</p>
@@ -201,7 +210,7 @@
 									Impact
 									<Tooltip.Root>
 										<Tooltip.Trigger>
-											<CircleHelp class="h-3.5 w-3.5 text-muted-foreground/60" />
+											<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
 										</Tooltip.Trigger>
 										<Tooltip.Content>
 											<p class="text-xs">Priority based on traffic × variance</p>
@@ -273,6 +282,16 @@
 					<Bug class="h-5 w-5 text-destructive" />
 				</div>
 				<h2 class="text-2xl font-bold tracking-tight">Issues</h2>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						<div class="flex h-4 w-4 items-center justify-center rounded-full bg-muted-foreground/20">
+							<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
+						</div>
+					</Tooltip.Trigger>
+					<Tooltip.Content>
+						<p>Latest exceptions and errors to address from the last 24 hours</p>
+					</Tooltip.Content>
+				</Tooltip.Root>
 			</div>
 			<div class="rounded-md border overflow-hidden">
 				<Table.Root>
@@ -283,7 +302,7 @@
 									Issue
 									<Tooltip.Root>
 										<Tooltip.Trigger>
-											<CircleHelp class="h-3.5 w-3.5 text-muted-foreground/60" />
+											<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
 										</Tooltip.Trigger>
 										<Tooltip.Content>
 											<p class="text-xs">The error message or exception that occurred</p>
@@ -296,7 +315,7 @@
 									Count
 									<Tooltip.Root>
 										<Tooltip.Trigger>
-											<CircleHelp class="h-3.5 w-3.5 text-muted-foreground/60" />
+											<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
 										</Tooltip.Trigger>
 										<Tooltip.Content>
 											<p class="text-xs">Number of times this issue occurred</p>
@@ -309,7 +328,7 @@
 									When
 									<Tooltip.Root>
 										<Tooltip.Trigger>
-											<CircleHelp class="h-3.5 w-3.5 text-muted-foreground/60" />
+											<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
 										</Tooltip.Trigger>
 										<Tooltip.Content>
 											<p class="text-xs">When this issue last occurred</p>

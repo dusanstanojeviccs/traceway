@@ -9,13 +9,9 @@ import (
 	"unsafe"
 )
 
-func GetMemoryUsedPercent() (float64, error) {
-	mem, err := getTotalVirtualMemory()
-	if err != nil {
-		return 0, err
-	}
-
-	return float64(mem) / 1024 / 1024, nil
+// GetTotalMemory returns total physical memory in bytes
+func GetTotalMemory() (uint64, error) {
+	return getTotalVirtualMemory()
 }
 
 func getTotalVirtualMemory() (uint64, error) {

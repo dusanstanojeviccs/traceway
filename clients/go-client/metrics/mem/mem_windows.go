@@ -5,10 +5,8 @@ import (
 	"unsafe"
 )
 
-// TODO: TEST WINDOWS MEMORY READING
-
-// Windows: call GlobalMemoryStatusEx
-func GetMemoryUsedPercent() (float64, error) {
+// GetTotalMemory returns total physical memory in bytes
+func GetTotalMemory() (uint64, error) {
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
 	proc := kernel32.NewProc("GlobalMemoryStatusEx")
 
@@ -25,5 +23,5 @@ func GetMemoryUsedPercent() (float64, error) {
 	if ret == 0 {
 		return 0, err
 	}
-	return float64(mem.dwMemoryLoad), nil // Windows gives us the percentage directly
+	return mem.ullTotalPhys, nil
 }

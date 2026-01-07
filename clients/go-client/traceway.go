@@ -357,18 +357,19 @@ func (s *CollectionFrameStore) safeProcessMetrics() {
 		}
 	}
 
-	memPercent, err := mem.GetMemoryUsedPercent()
-	if err == nil {
-		CaptureMetric(MetricNameMemoryUsagePcnt, memPercent)
-	} else {
-		if s.debug {
-			log.Println("Traceway mem not read", err)
-		}
-	}
-
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	CaptureMetric(MetricNameMemoryUsage, float64(m.Alloc)/1024/1024)
+
+	totalMem, err := mem.GetTotalMemory()
+	if err == nil && totalMem > 0 {
+		memPercent := (float64(m.Alloc) / float64(totalMem)) * 100
+		CaptureMetric(MetricNameMemoryUsagePcnt, memPercent)
+	} else {
+		if s.debug {
+			log.Println("Traceway total mem not read", err)
+		}
+	}
 	CaptureMetric(MetricNameGoRoutines, float64(runtime.NumGoroutine()))
 	CaptureMetric(MetricNameHeapObjects, float64(m.HeapObjects))
 	CaptureMetric(MetricNameNumGC, float64(m.NumGC))
