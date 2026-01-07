@@ -34,6 +34,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 
 	router.POST("/stats", middleware.UseAppAuth, MetricRecordController.FindHomepageStats)
 	router.GET("/dashboard", middleware.UseAppAuth, DashboardController.GetDashboard)
+	router.GET("/dashboard/overview", middleware.UseAppAuth, DashboardController.GetDashboardOverview)
 
 	router.POST("/transactions", middleware.UseAppAuth, TransactionController.FindAllTransactions)
 	router.POST("/transactions/grouped", middleware.UseAppAuth, TransactionController.FindGroupedByEndpoint)

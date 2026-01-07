@@ -1,6 +1,9 @@
 package main
 
 import (
+	"errors"
+	"math/rand/v2"
+	"time"
 	"traceway"
 	tracewaygin "traceway/traceway_gin"
 
@@ -22,7 +25,19 @@ func testGin() {
 	))
 
 	router.GET("/test-exception", func(ctx *gin.Context) {
+		time.Sleep(time.Duration(rand.IntN(2000)) * time.Millisecond)
 		panic("Cool")
+	})
+
+	router.GET("/test-self-report-scope", func(ctx *gin.Context) {
+		traceway.CaptureExceptionWithScope(errors.New("Test"), map[string]string{"Cool": "Pretty cool"}, nil)
+	})
+
+	router.GET("/test-self-report-context", func(ctx *gin.Context) {
+		scope := traceway.GetScopeFromContext(ctx)
+		scope.SetTag("Interesting", "Pretty Cool")
+
+		traceway.CaptureExceptionWithContext(ctx, errors.New("Test2"))
 	})
 
 	router.GET("/test-ok", func(ctx *gin.Context) {

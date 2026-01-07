@@ -37,8 +37,7 @@ func (e transactionController) FindAllTransactions(c *gin.Context) {
 
 	transactions, total, err := repositories.TransactionRepository.FindAll(c, request.ProjectId, request.FromDate, request.ToDate, request.Pagination.Page, request.Pagination.PageSize, request.OrderBy)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		panic(err)
 	}
 
 	c.JSON(http.StatusOK, PaginatedResponse[models.Transaction]{
@@ -61,8 +60,7 @@ func (e transactionController) FindGroupedByEndpoint(c *gin.Context) {
 
 	stats, total, err := repositories.TransactionRepository.FindGroupedByEndpoint(c, request.ProjectId, request.FromDate, request.ToDate, request.Pagination.Page, request.Pagination.PageSize, request.OrderBy)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		panic(err)
 	}
 
 	c.JSON(http.StatusOK, PaginatedResponse[models.EndpointStats]{
@@ -97,8 +95,7 @@ func (e transactionController) FindByEndpoint(c *gin.Context) {
 
 	transactions, total, err := repositories.TransactionRepository.FindByEndpoint(c, request.ProjectId, endpoint, request.FromDate, request.ToDate, request.Pagination.Page, request.Pagination.PageSize, request.OrderBy)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		panic(err)
 	}
 
 	c.JSON(http.StatusOK, PaginatedResponse[models.Transaction]{

@@ -9,6 +9,7 @@
     import { Skeleton } from "$lib/components/ui/skeleton";
     import { ErrorDisplay } from "$lib/components/ui/error-display";
     import { projectsState } from '$lib/state/projects.svelte';
+    import { ArrowRight } from "lucide-svelte";
 
     type ExceptionGroup = {
         exceptionHash: string;
@@ -23,6 +24,7 @@
         exceptionHash: string;
         stackTrace: string;
         recordedAt: string;
+        scope: Record<string, string> | null;
     };
 
     let group = $state<ExceptionGroup | null>(null);
@@ -30,12 +32,11 @@
     let loading = $state(true);
     let error = $state('');
     let notFound = $state(false);
-
-    // Pagination
-    let currentPage = $state(1);
-    let pageSize = $state(20);
     let total = $state(0);
-    let totalPages = $state(0);
+
+    // Get scope from the most recent occurrence for display
+    const latestScope = $derived(occurrences[0]?.scope);
+    const hasMoreOccurrences = $derived(total > 10);
 
     async function loadData() {
         loading = true;
@@ -46,15 +47,14 @@
             const exceptionHash = page.params.exceptionHash;
             const response = await api.post(`/exception-stack-traces/${exceptionHash}`, {
                 pagination: {
-                    page: currentPage,
-                    pageSize: pageSize
+                    page: 1,
+                    pageSize: 10
                 }
             }, { projectId: projectsState.currentProjectId ?? undefined });
 
             group = response.group;
             occurrences = response.occurrences || [];
             total = response.pagination.total;
-            totalPages = response.pagination.totalPages;
         } catch (e: any) {
             console.error(e);
             if (e.status === 404) {
@@ -67,11 +67,18 @@
         }
     }
 
-    function handlePageChange(newPage: number) {
-        if (newPage >= 1 && newPage <= totalPages) {
-            currentPage = newPage;
-            loadData();
-        }
+    function formatRelativeTime(dateStr: string): string {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        return `${diffDays}d ago`;
     }
 
     onMount(() => {
@@ -139,6 +146,26 @@
             </Card.Content>
         </Card.Root>
 
+        <!-- Context Card -->
+        {#if latestScope && Object.keys(latestScope).length > 0}
+        <Card.Root>
+            <Card.Header>
+                <Card.Title>Context</Card.Title>
+                <Card.Description>Additional context captured with this exception (from most recent occurrence)</Card.Description>
+            </Card.Header>
+            <Card.Content>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {#each Object.entries(latestScope).sort((a, b) => a[0].localeCompare(b[0])) as [key, value]}
+                        <div class="flex flex-col gap-1 p-3 rounded-md bg-muted">
+                            <span class="text-xs font-medium text-muted-foreground">{key}</span>
+                            <span class="text-sm font-mono break-all">{value}</span>
+                        </div>
+                    {/each}
+                </div>
+            </Card.Content>
+        </Card.Root>
+        {/if}
+
         <!-- Occurrences Table -->
         <Card.Root>
             <Card.Header>
@@ -170,35 +197,20 @@
                                         </Table.Cell>
                                     </Table.Row>
                                 {/each}
+                                {#if hasMoreOccurrences}
+                                    <Table.Row
+                                        class="cursor-pointer bg-muted/50 hover:bg-muted"
+                                        onclick={() => goto(`/issues/${page.params.exceptionHash}/events`)}
+                                    >
+                                        <Table.Cell colspan={2} class="py-2 text-center text-sm text-muted-foreground">
+                                            View all {total} events <ArrowRight class="inline h-3.5 w-3.5" />
+                                        </Table.Cell>
+                                    </Table.Row>
+                                {/if}
                             {/if}
                         </Table.Body>
                     </Table.Root>
                 </div>
-
-                <!-- Pagination -->
-                {#if totalPages > 1}
-                    <div class="flex items-center justify-end space-x-2 py-4">
-                        <div class="text-sm text-muted-foreground">
-                            Page {currentPage} of {totalPages}
-                        </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onclick={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage <= 1}
-                        >
-                            Previous
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onclick={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage >= totalPages}
-                        >
-                            Next
-                        </Button>
-                    </div>
-                {/if}
             </Card.Content>
         </Card.Root>
     {/if}

@@ -1,6 +1,10 @@
 package tracewaygin
 
 import (
+	"context"
+	"net/http"
+	"os"
+	"sync"
 	"time"
 	"traceway"
 
@@ -8,11 +12,39 @@ import (
 	"github.com/google/uuid"
 )
 
+// Cached values for default scope tags
+var (
+	cachedHostname    string
+	cachedEnvironment string
+	initOnce          sync.Once
+)
+
+func initCachedValues() {
+	initOnce.Do(func() {
+		hostname, err := os.Hostname()
+		if err != nil {
+			cachedHostname = "unknown"
+		} else {
+			cachedHostname = hostname
+		}
+
+		cachedEnvironment = os.Getenv("TRACEWAY_ENV")
+		if cachedEnvironment == "" {
+			cachedEnvironment = os.Getenv("GO_ENV")
+		}
+		if cachedEnvironment == "" {
+			cachedEnvironment = "development"
+		}
+	})
+}
+
 func wrapAndExecute(c *gin.Context) (s *string) {
 	defer func() {
 		if r := recover(); r != nil {
 			m := traceway.FormatRWithStack(r, traceway.CaptureStack(2))
 			s = &m
+			// we don't propagate just report
+			c.AbortWithStatus(http.StatusInternalServerError)
 		}
 	}()
 	c.Next()
@@ -21,15 +53,26 @@ func wrapAndExecute(c *gin.Context) (s *string) {
 
 func New(app, connectionString string, options ...func(*traceway.TracewayOptions)) gin.HandlerFunc {
 	traceway.Init(app, connectionString, options...)
+	initCachedValues()
 
 	return func(c *gin.Context) {
 		start := time.Now()
 
-		path := c.Request.URL.Path
-		query := c.Request.URL.RawQuery
 		method := c.Request.Method
 		clientIP := c.ClientIP()
 		transactionId := uuid.NewString()
+
+		// Create request-scoped scope with defaults
+		scope := traceway.NewScope()
+		scope.SetTag("server_name", cachedHostname)
+		scope.SetTag("user_agent", c.Request.UserAgent())
+		scope.SetTag("environment", cachedEnvironment)
+
+		// Store scope in both gin.Context and request context
+		ctx := context.WithValue(c.Request.Context(), string(traceway.CtxScopeKey), scope)
+		c.Request = c.Request.WithContext(ctx)
+		c.Set(string(traceway.CtxScopeKey), scope)
+		c.Set(string(traceway.CtxTransactionIdKey), &transactionId)
 
 		stackTraceFormatted := wrapAndExecute(c)
 
@@ -38,18 +81,26 @@ func New(app, connectionString string, options ...func(*traceway.TracewayOptions
 		statusCode := c.Writer.Status()
 		bodySize := c.Writer.Size()
 
-		if query != "" {
-			path = path + "?" + query
+		if bodySize < 0 {
+			bodySize = 0
 		}
 
-		transactionEndpoint := method + " " + path
+		// Use the registered route pattern (e.g., /users/:id) instead of actual path
+		routePath := c.FullPath()
+		if routePath == "" {
+			// Fallback to actual path for unmatched routes
+			routePath = c.Request.URL.Path
+		}
+
+		transactionEndpoint := method + " " + routePath
 
 		defer recover()
 
-		traceway.CaptureTransaction(transactionId, transactionEndpoint, duration, start, statusCode, bodySize, clientIP)
+		// Capture transaction with scope
+		traceway.CaptureTransactionWithScope(transactionId, transactionEndpoint, duration, start, statusCode, bodySize, clientIP, scope.GetTags())
 
 		if stackTraceFormatted != nil {
-			traceway.CaptureTransactionException(transactionId, *stackTraceFormatted)
+			traceway.CaptureTransactionExceptionWithScope(transactionId, *stackTraceFormatted, scope.GetTags())
 		}
 	}
 }

@@ -6,9 +6,10 @@ import (
 )
 
 type ClientExceptionStackTrace struct {
-	TransactionId *string   `json:"transactionId"`
-	StackTrace    string    `json:"stackTrace"`
-	RecordedAt    time.Time `json:"recordedAt"`
+	TransactionId *string           `json:"transactionId"`
+	StackTrace    string            `json:"stackTrace"`
+	RecordedAt    time.Time         `json:"recordedAt"`
+	Scope         map[string]string `json:"scope"`
 }
 
 func (c *ClientExceptionStackTrace) ToExceptionStackTrace(exceptionHash string) models.ExceptionStackTrace {
@@ -17,6 +18,7 @@ func (c *ClientExceptionStackTrace) ToExceptionStackTrace(exceptionHash string) 
 		TransactionId: c.TransactionId,
 		StackTrace:    c.StackTrace,
 		RecordedAt:    c.RecordedAt,
+		Scope:         c.Scope,
 	}
 }
 
@@ -35,13 +37,14 @@ func (c *ClientMetricRecord) ToMetricRecord() models.MetricRecord {
 }
 
 type ClientTransaction struct {
-	Id         string        `json:"id"`
-	Endpoint   string        `json:"endpoint"`
-	Duration   time.Duration `json:"duration"`
-	RecordedAt time.Time     `json:"recordedAt"`
-	StatusCode int           `json:"statusCode"`
-	BodySize   int           `json:"bodySize"`
-	ClientIP   string        `json:"clientIP"`
+	Id         string            `json:"id"`
+	Endpoint   string            `json:"endpoint"`
+	Duration   time.Duration     `json:"duration"`
+	RecordedAt time.Time         `json:"recordedAt"`
+	StatusCode int               `json:"statusCode"`
+	BodySize   int               `json:"bodySize"`
+	ClientIP   string            `json:"clientIP"`
+	Scope      map[string]string `json:"scope"`
 }
 
 func (c *ClientTransaction) ToTransaction() models.Transaction {
@@ -53,6 +56,7 @@ func (c *ClientTransaction) ToTransaction() models.Transaction {
 		StatusCode: int32(c.StatusCode),
 		BodySize:   int32(c.BodySize),
 		ClientIP:   c.ClientIP,
+		Scope:      c.Scope,
 	}
 }
 

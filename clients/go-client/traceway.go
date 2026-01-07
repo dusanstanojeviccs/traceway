@@ -3,10 +3,12 @@ package traceway
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"reflect"
 	"runtime"
 	"runtime/debug"
@@ -18,6 +20,138 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// Context key for scope
+type tracewayContextKey string
+
+const CtxScopeKey tracewayContextKey = "TRACEWAY_SCOPE"
+const CtxTransactionIdKey tracewayContextKey = "TRACEWAY_TRANSACTION_ID"
+
+// Scope holds contextual data for exceptions and transactions
+type Scope struct {
+	tags map[string]string
+	mu   sync.RWMutex
+}
+
+// NewScope creates a new empty scope
+func NewScope() *Scope {
+	return &Scope{tags: make(map[string]string)}
+}
+
+// SetTag sets a tag on the scope
+func (s *Scope) SetTag(key, value string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.tags[key] = value
+}
+
+// GetTag gets a tag from the scope
+func (s *Scope) GetTag(key string) (string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	val, ok := s.tags[key]
+	return val, ok
+}
+
+// GetTags returns a copy of all tags
+func (s *Scope) GetTags() map[string]string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make(map[string]string, len(s.tags))
+	for k, v := range s.tags {
+		result[k] = v
+	}
+	return result
+}
+
+// Clone creates a deep copy of the scope
+func (s *Scope) Clone() *Scope {
+	return &Scope{tags: s.GetTags()}
+}
+
+// Clear removes all tags from the scope
+func (s *Scope) Clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.tags = make(map[string]string)
+}
+
+// Global default scope
+var defaultScope = NewScope()
+
+// ConfigureScope modifies the global default scope (persistent changes)
+func ConfigureScope(fn func(*Scope)) {
+	fn(defaultScope)
+}
+
+// WithScope creates an isolated scope clone for the callback and returns a new context
+func WithScope(ctx context.Context, fn func(*Scope)) context.Context {
+	scope := GetScopeFromContext(ctx).Clone()
+	fn(scope)
+	return context.WithValue(ctx, CtxScopeKey, scope)
+}
+
+// GetScopeFromContext retrieves scope from context, falls back to default clone
+func GetScopeFromContext(ctx context.Context) *Scope {
+	if ctx == nil {
+		return defaultScope.Clone()
+	}
+	if scope, ok := ctx.Value(string(CtxScopeKey)).(*Scope); ok && scope != nil {
+		return scope
+	}
+
+	return defaultScope.Clone()
+}
+
+// GetScopeFromGin is a convenience helper for Gin handlers
+func GetScopeFromGin(c *gin.Context) *Scope {
+	if scope, ok := c.Get(string(CtxScopeKey)); ok {
+		if s, ok := scope.(*Scope); ok {
+			return s
+		}
+	}
+	return GetScopeFromContext(c.Request.Context())
+}
+
+func GetTransactionIdFromContext(ctx context.Context) *string {
+	if val, ok := ctx.Value(string(CtxTransactionIdKey)).(*string); ok {
+		return val
+	}
+	return nil
+}
+
+// GetHostname returns the hostname, cached for efficiency
+var cachedHostname string
+var hostnameOnce sync.Once
+
+func getHostname() string {
+	hostnameOnce.Do(func() {
+		hostname, err := os.Hostname()
+		if err != nil {
+			cachedHostname = "unknown"
+		} else {
+			cachedHostname = hostname
+		}
+	})
+	return cachedHostname
+}
+
+// GetEnvironment returns the environment from TRACEWAY_ENV or GO_ENV
+var cachedEnvironment string
+var envOnce sync.Once
+
+func getEnvironment() string {
+	envOnce.Do(func() {
+		cachedEnvironment = os.Getenv("TRACEWAY_ENV")
+		if cachedEnvironment == "" {
+			cachedEnvironment = os.Getenv("GO_ENV")
+		}
+		if cachedEnvironment == "" {
+			cachedEnvironment = "development"
+		}
+	})
+	return cachedEnvironment
+}
 
 func CaptureStack(skip int) []runtime.Frame {
 	const maxDepth = 64
@@ -78,9 +212,10 @@ func FormatErrorWithStack(err error, frames []runtime.Frame) string {
 }
 
 type ExceptionStackTrace struct {
-	TransactionId *string   `json:"transactionId"`
-	StackTrace    string    `json:"stackTrace"`
-	RecordedAt    time.Time `json:"recordedAt"`
+	TransactionId *string           `json:"transactionId"`
+	StackTrace    string            `json:"stackTrace"`
+	RecordedAt    time.Time         `json:"recordedAt"`
+	Scope         map[string]string `json:"scope,omitempty"`
 }
 
 type MetricRecord struct {
@@ -90,13 +225,14 @@ type MetricRecord struct {
 }
 
 type Transaction struct {
-	Id         string        `json:"id"`
-	Endpoint   string        `json:"endpoint"`
-	Duration   time.Duration `json:"duration"`
-	RecordedAt time.Time     `json:"recordedAt"`
-	StatusCode int           `json:"statusCode"`
-	BodySize   int           `json:"bodySize"`
-	ClientIP   string        `json:"clientIP"`
+	Id         string            `json:"id"`
+	Endpoint   string            `json:"endpoint"`
+	Duration   time.Duration     `json:"duration"`
+	RecordedAt time.Time         `json:"recordedAt"`
+	StatusCode int               `json:"statusCode"`
+	BodySize   int               `json:"bodySize"`
+	ClientIP   string            `json:"clientIP"`
+	Scope      map[string]string `json:"scope,omitempty"`
 }
 
 type CollectionFrame struct {
@@ -458,6 +594,7 @@ func CaptureMetric(name string, value float64) {
 	}
 }
 
+// CaptureTransaction captures a transaction without scope (backward compatible)
 func CaptureTransaction(
 	transactionId string,
 	endpoint string,
@@ -466,40 +603,77 @@ func CaptureTransaction(
 	statusCode, bodySize int,
 	clientIP string,
 ) {
+	CaptureTransactionWithScope(transactionId, endpoint, d, startedAt, statusCode, bodySize, clientIP, nil)
+}
+
+// CaptureTransactionWithScope captures a transaction with scope
+func CaptureTransactionWithScope(
+	transactionId string,
+	endpoint string,
+	d time.Duration,
+	startedAt time.Time,
+	statusCode, bodySize int,
+	clientIP string,
+	scope map[string]string,
+) {
 	collectionFrameStore.messageQueue <- CollectionFrameMessage{
 		msgType: CollectionFrameMessageTypeTransaction,
 		transaction: &Transaction{
-			Id:         transactionId, // for regular recover we don't need a transaction
+			Id:         transactionId,
 			Endpoint:   endpoint,
 			Duration:   d,
 			RecordedAt: startedAt,
 			StatusCode: statusCode,
 			BodySize:   bodySize,
 			ClientIP:   clientIP,
+			Scope:      scope,
 		},
 	}
 }
+
+// CaptureTransactionException captures an exception linked to a transaction (backward compatible)
 func CaptureTransactionException(transactionId string, stacktrace string) {
+	CaptureTransactionExceptionWithScope(transactionId, stacktrace, nil)
+}
+
+// CaptureTransactionExceptionWithScope captures an exception linked to a transaction with scope
+func CaptureTransactionExceptionWithScope(transactionId string, stacktrace string, scope map[string]string) {
 	collectionFrameStore.messageQueue <- CollectionFrameMessage{
 		msgType: CollectionFrameMessageTypeException,
 		exceptionStackTrace: &ExceptionStackTrace{
 			TransactionId: &transactionId,
 			StackTrace:    stacktrace,
 			RecordedAt:    time.Now(),
-		},
-	}
-}
-func CaptureException(err error) {
-	collectionFrameStore.messageQueue <- CollectionFrameMessage{
-		msgType: CollectionFrameMessageTypeException,
-		exceptionStackTrace: &ExceptionStackTrace{
-			TransactionId: nil, // for regular recover we don't need a transaction
-			StackTrace:    FormatErrorWithStack(err, CaptureStack(2)),
-			RecordedAt:    time.Now(),
+			Scope:         scope,
 		},
 	}
 }
 
+// CaptureException captures an exception without context (backward compatible)
+func CaptureException(err error) {
+	CaptureExceptionWithScope(err, nil, nil)
+}
+
+// CaptureExceptionWithScope captures an exception with scope
+func CaptureExceptionWithScope(err error, scope map[string]string, transactionId *string) {
+	collectionFrameStore.messageQueue <- CollectionFrameMessage{
+		msgType: CollectionFrameMessageTypeException,
+		exceptionStackTrace: &ExceptionStackTrace{
+			TransactionId: transactionId,
+			StackTrace:    FormatErrorWithStack(err, CaptureStack(2)),
+			RecordedAt:    time.Now(),
+			Scope:         scope,
+		},
+	}
+}
+
+// CaptureExceptionWithContext captures an exception extracting scope from context
+func CaptureExceptionWithContext(ctx context.Context, err error) {
+	scope := GetScopeFromContext(ctx)
+	CaptureExceptionWithScope(err, scope.GetTags(), GetTransactionIdFromContext(ctx))
+}
+
+// Recover recovers from panic and captures it (backward compatible, no scope)
 func Recover() {
 	r := recover()
 
@@ -507,9 +681,27 @@ func Recover() {
 		collectionFrameStore.messageQueue <- CollectionFrameMessage{
 			msgType: CollectionFrameMessageTypeException,
 			exceptionStackTrace: &ExceptionStackTrace{
-				TransactionId: nil, // for regular recover we don't need a transaction
+				TransactionId: nil,
 				StackTrace:    FormatRWithStack(r, CaptureStack(2)),
 				RecordedAt:    time.Now(),
+			},
+		}
+	}
+}
+
+// RecoverWithContext recovers from panic and captures it with scope from context
+func RecoverWithContext(ctx context.Context) {
+	r := recover()
+
+	if r != nil {
+		scope := GetScopeFromContext(ctx)
+		collectionFrameStore.messageQueue <- CollectionFrameMessage{
+			msgType: CollectionFrameMessageTypeException,
+			exceptionStackTrace: &ExceptionStackTrace{
+				TransactionId: nil,
+				StackTrace:    FormatRWithStack(r, CaptureStack(2)),
+				RecordedAt:    time.Now(),
+				Scope:         scope.GetTags(),
 			},
 		}
 	}

@@ -10,6 +10,7 @@
     import { CalendarDate, getLocalTimeZone, today } from "@internationalized/date";
     import { ErrorDisplay } from "$lib/components/ui/error-display";
     import { projectsState } from '$lib/state/projects.svelte';
+    import ScopeDisplay from '$lib/components/scope-display.svelte';
 
     type Transaction = {
         id: string;
@@ -19,6 +20,7 @@
         statusCode: number;
         bodySize: number;
         clientIP: string;
+        scope: Record<string, string> | null;
     };
 
     type SortField = 'recorded_at' | 'duration' | 'status_code' | 'body_size';
@@ -281,6 +283,7 @@
                         </Button>
                     </Table.Head>
                     <Table.Head class="w-[140px]">Client IP</Table.Head>
+                    <Table.Head>Context</Table.Head>
                 </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -292,11 +295,12 @@
                             <Table.Cell><Skeleton class="h-4 w-[50px]" /></Table.Cell>
                             <Table.Cell><Skeleton class="h-4 w-[60px]" /></Table.Cell>
                             <Table.Cell><Skeleton class="h-4 w-[100px]" /></Table.Cell>
+                            <Table.Cell><Skeleton class="h-4 w-[150px]" /></Table.Cell>
                         </Table.Row>
                     {/each}
                 {:else if transactions.length === 0}
                     <Table.Row>
-                        <Table.Cell colspan={5} class="h-24 text-center">
+                        <Table.Cell colspan={6} class="h-24 text-center">
                             No transactions found in this time range.
                         </Table.Cell>
                     </Table.Row>
@@ -317,6 +321,9 @@
                             </Table.Cell>
                             <Table.Cell class="font-mono text-sm text-muted-foreground">
                                 {transaction.clientIP}
+                            </Table.Cell>
+                            <Table.Cell>
+                                <ScopeDisplay scope={transaction.scope} />
                             </Table.Cell>
                         </Table.Row>
                     {/each}

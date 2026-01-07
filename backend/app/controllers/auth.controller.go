@@ -22,10 +22,7 @@ func (a authController) Login(c *gin.Context) {
 
 	appToken := os.Getenv("APP_TOKEN")
 	if appToken == "" {
-		// Fallback or error if env not set, for safety.
-		// Assuming config is required.
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Server misconfiguration"})
-		return
+		panic("APP_TOKEN environment variable is not set")
 	}
 
 	if request.Token != appToken {

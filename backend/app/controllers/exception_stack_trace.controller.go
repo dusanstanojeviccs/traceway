@@ -41,8 +41,7 @@ func (e exceptionStackTraceController) FindGrouppedExceptionStackTraces(c *gin.C
 
 	exceptions, total, err := repositories.ExceptionStackTraceRepository.FindGrouped(c, request.ProjectId, request.FromDate, request.ToDate, request.Pagination.Page, request.Pagination.PageSize, request.OrderBy, request.Search)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		panic(err)
 	}
 
 	c.JSON(http.StatusOK, PaginatedResponse[models.ExceptionGroup]{
@@ -75,8 +74,7 @@ func (e exceptionStackTraceController) FindByHash(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Exception not found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		panic(err)
 	}
 
 	c.JSON(http.StatusOK, ExceptionDetailResponse{

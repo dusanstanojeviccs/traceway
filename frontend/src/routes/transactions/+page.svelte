@@ -20,7 +20,7 @@
         lastSeen: string;
     };
 
-    type SortField = 'count' | 'p50_duration' | 'p95_duration' | 'last_seen';
+    type SortField = 'count' | 'p50_duration' | 'p95_duration' | 'last_seen' | 'impact';
 
     let endpoints = $state<EndpointStats[]>([]);
     let loading = $state(true);
@@ -38,8 +38,8 @@
     let fromTime = $state('00:00');
     let toTime = $state('23:59');
 
-    // Sorting
-    let orderBy = $state<SortField>('count');
+    // Sorting - default to impact
+    let orderBy = $state<SortField>('impact');
 
     // Page size options
     const pageSizeOptions = [
@@ -74,11 +74,31 @@
     function formatDuration(nanoseconds: number): string {
         const ms = nanoseconds / 1_000_000;
         if (ms < 1) {
-            return `${(nanoseconds / 1000).toFixed(2)}µs`;
+            return `${(nanoseconds / 1000).toFixed(0)}µs`;
         } else if (ms < 1000) {
-            return `${ms.toFixed(2)}ms`;
+            return `${ms.toFixed(0)}ms`;
         } else {
-            return `${(ms / 1000).toFixed(2)}s`;
+            return `${(ms / 1000).toFixed(1)}s`;
+        }
+    }
+
+    // Calculate impact score based on call volume and response time variance
+    function calculateImpact(count: number, p50: number, p95: number): { score: number; level: 'critical' | 'high' | 'medium' | 'low' } {
+        const varianceMs = (p95 - p50) / 1_000_000;
+        const score = count * varianceMs;
+        if (score > 100) return { score, level: 'critical' };
+        if (score > 10) return { score, level: 'high' };
+        if (score > 1) return { score, level: 'medium' };
+        return { score, level: 'low' };
+    }
+
+    function getImpactIndicator(count: number, p50: number, p95: number): { text: string; class: string } {
+        const { level } = calculateImpact(count, p50, p95);
+        switch (level) {
+            case 'critical': return { text: '!!!', class: 'text-red-500 font-bold' };
+            case 'high': return { text: '!!', class: 'text-orange-500 font-bold' };
+            case 'medium': return { text: '!', class: 'text-yellow-500 font-bold' };
+            default: return { text: '-', class: 'text-muted-foreground' };
         }
     }
 
@@ -161,14 +181,14 @@
             <Table.Header>
                 <Table.Row>
                     <Table.Head>Endpoint</Table.Head>
-                    <Table.Head class="w-[120px]">
+                    <Table.Head class="w-[100px]">
                         <Button
                             variant="ghost"
                             size="sm"
                             class="h-8 -ml-3 font-medium"
                             onclick={() => handleSort('count')}
                         >
-                            Requests
+                            Calls
                             {#if orderBy === 'count'}
                                 <ArrowDown class="ml-2 h-4 w-4" />
                             {:else}
@@ -176,14 +196,14 @@
                             {/if}
                         </Button>
                     </Table.Head>
-                    <Table.Head class="w-[120px]">
+                    <Table.Head class="w-[100px]">
                         <Button
                             variant="ghost"
                             size="sm"
                             class="h-8 -ml-3 font-medium"
                             onclick={() => handleSort('p50_duration')}
                         >
-                            P50
+                            Typical
                             {#if orderBy === 'p50_duration'}
                                 <ArrowDown class="ml-2 h-4 w-4" />
                             {:else}
@@ -191,14 +211,14 @@
                             {/if}
                         </Button>
                     </Table.Head>
-                    <Table.Head class="w-[120px]">
+                    <Table.Head class="w-[100px]">
                         <Button
                             variant="ghost"
                             size="sm"
                             class="h-8 -ml-3 font-medium"
                             onclick={() => handleSort('p95_duration')}
                         >
-                            P95
+                            Slow
                             {#if orderBy === 'p95_duration'}
                                 <ArrowDown class="ml-2 h-4 w-4" />
                             {:else}
@@ -206,15 +226,15 @@
                             {/if}
                         </Button>
                     </Table.Head>
-                    <Table.Head class="w-[180px]">
+                    <Table.Head class="w-[80px]">
                         <Button
                             variant="ghost"
                             size="sm"
                             class="h-8 -ml-3 font-medium"
-                            onclick={() => handleSort('last_seen')}
+                            onclick={() => handleSort('impact')}
                         >
-                            Last Seen
-                            {#if orderBy === 'last_seen'}
+                            Impact
+                            {#if orderBy === 'impact'}
                                 <ArrowDown class="ml-2 h-4 w-4" />
                             {:else}
                                 <ArrowUpDown class="ml-2 h-4 w-4" />
@@ -228,10 +248,10 @@
                     {#each Array(5) as _}
                         <Table.Row>
                             <Table.Cell><Skeleton class="h-4 w-[250px]" /></Table.Cell>
+                            <Table.Cell><Skeleton class="h-4 w-[50px]" /></Table.Cell>
                             <Table.Cell><Skeleton class="h-4 w-[60px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[80px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[80px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[140px]" /></Table.Cell>
+                            <Table.Cell><Skeleton class="h-4 w-[60px]" /></Table.Cell>
+                            <Table.Cell><Skeleton class="h-4 w-[30px]" /></Table.Cell>
                         </Table.Row>
                     {/each}
                 {:else if error}
@@ -242,12 +262,13 @@
                     </Table.Row>
                 {:else if endpoints.length === 0}
                     <Table.Row>
-                        <Table.Cell colspan={5} class="h-24 text-center">
-                            No transactions found in this time range.
+                        <Table.Cell colspan={5} class="h-24 text-center text-muted-foreground">
+                            No transaction data received yet
                         </Table.Cell>
                     </Table.Row>
                 {:else}
                     {#each endpoints as endpoint}
+                        {@const impact = getImpactIndicator(endpoint.count, endpoint.p50Duration, endpoint.p95Duration)}
                         <Table.Row
                             class="cursor-pointer hover:bg-muted/50"
                             onclick={() => navigateToEndpoint(endpoint.endpoint)}
@@ -255,17 +276,17 @@
                             <Table.Cell class="font-mono text-sm">
                                 {endpoint.endpoint}
                             </Table.Cell>
-                            <Table.Cell class="font-medium">
+                            <Table.Cell class="tabular-nums">
                                 {endpoint.count.toLocaleString()}
                             </Table.Cell>
-                            <Table.Cell class="font-mono text-sm">
+                            <Table.Cell class="font-mono text-sm tabular-nums">
                                 {formatDuration(endpoint.p50Duration)}
                             </Table.Cell>
-                            <Table.Cell class="font-mono text-sm">
+                            <Table.Cell class="font-mono text-sm tabular-nums">
                                 {formatDuration(endpoint.p95Duration)}
                             </Table.Cell>
-                            <Table.Cell class="text-muted-foreground">
-                                {new Date(endpoint.lastSeen).toLocaleString()}
+                            <Table.Cell class="font-mono text-sm tabular-nums">
+                                <span class={impact.class}>{impact.text}</span>
                             </Table.Cell>
                         </Table.Row>
                     {/each}

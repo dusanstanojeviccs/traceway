@@ -11,6 +11,35 @@ import (
 
 type dashboardController struct{}
 
+type DashboardOverviewResponse struct {
+	RecentIssues    []models.ExceptionGroup `json:"recentIssues"`
+	WorstEndpoints  []models.EndpointStats  `json:"worstEndpoints"`
+}
+
+func (d dashboardController) GetDashboardOverview(c *gin.Context) {
+	projectId := c.Query("projectId")
+
+	now := time.Now()
+	start := now.Add(-24 * time.Hour)
+
+	// Get last 10 issues in the last 24 hours
+	recentIssues, _, err := repositories.ExceptionStackTraceRepository.FindGrouped(c, projectId, start, now, 1, 10, "last_seen", "")
+	if err != nil {
+		panic(err)
+	}
+
+	// Get 10 worst performing endpoints
+	worstEndpoints, err := repositories.TransactionRepository.FindWorstEndpoints(c, projectId, start, now, 10)
+	if err != nil {
+		panic(err)
+	}
+
+	c.JSON(http.StatusOK, DashboardOverviewResponse{
+		RecentIssues:   recentIssues,
+		WorstEndpoints: worstEndpoints,
+	})
+}
+
 func (d dashboardController) GetDashboard(c *gin.Context) {
 	projectId := c.Query("projectId")
 
@@ -24,8 +53,7 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	// 1. Requests count
 	requestsTrend, err := repositories.TransactionRepository.CountByHour(c, projectId, start, now)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		panic(err)
 	}
 	requestsCurrent, _ := repositories.TransactionRepository.CountBetween(c, projectId, start, now)
 	requestsPrev, _ := repositories.TransactionRepository.CountBetween(c, projectId, prevStart, prevEnd)
@@ -34,8 +62,7 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	// 2. Exceptions count
 	exceptionsTrend, err := repositories.ExceptionStackTraceRepository.CountByHour(c, projectId, start, now)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		panic(err)
 	}
 	exceptionsCurrent, _ := repositories.ExceptionStackTraceRepository.CountBetween(c, projectId, start, now)
 	exceptionsPrev, _ := repositories.ExceptionStackTraceRepository.CountBetween(c, projectId, prevStart, prevEnd)
@@ -44,8 +71,7 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	// 3. Average Response Time
 	avgDurationTrend, err := repositories.TransactionRepository.AvgDurationByHour(c, projectId, start, now)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		panic(err)
 	}
 	avgDurationCurrent := getLastValue(avgDurationTrend)
 	avgDurationPrevTrend, _ := repositories.TransactionRepository.AvgDurationByHour(c, projectId, prevStart, prevEnd)
@@ -55,8 +81,7 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	// 4. Error Rate
 	errorRateTrend, err := repositories.TransactionRepository.ErrorRateByHour(c, projectId, start, now)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		panic(err)
 	}
 	errorRateCurrent := getLastValue(errorRateTrend)
 	errorRatePrevTrend, _ := repositories.TransactionRepository.ErrorRateByHour(c, projectId, prevStart, prevEnd)
@@ -66,8 +91,7 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	// 5. CPU Usage
 	cpuTrend, err := repositories.MetricRecordRepository.GetAverageByHour(c, projectId, "cpu", start, now)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		panic(err)
 	}
 	cpuCurrent := getLastValue(cpuTrend)
 	cpuPrev, _ := repositories.MetricRecordRepository.GetAverageBetween(c, projectId, "cpu", prevStart, prevEnd)
@@ -76,8 +100,7 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	// 6. Memory Usage
 	memTrend, err := repositories.MetricRecordRepository.GetAverageByHour(c, projectId, "ram", start, now)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		panic(err)
 	}
 	memCurrent := getLastValue(memTrend)
 	memPrev, _ := repositories.MetricRecordRepository.GetAverageBetween(c, projectId, "ram", prevStart, prevEnd)

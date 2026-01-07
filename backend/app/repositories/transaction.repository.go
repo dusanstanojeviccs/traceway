@@ -4,18 +4,25 @@ import (
 	"backend/app/chdb"
 	"backend/app/models"
 	"context"
+	"encoding/json"
 	"time"
 )
 
 type transactionRepository struct{}
 
 func (e *transactionRepository) InsertAsync(ctx context.Context, lines []models.Transaction) error {
-	batch, err := (*chdb.Conn).PrepareBatch(ctx, "INSERT INTO transactions (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip)")
+	batch, err := (*chdb.Conn).PrepareBatch(ctx, "INSERT INTO transactions (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, scope)")
 	if err != nil {
 		return err
 	}
 	for _, t := range lines {
-		if err := batch.Append(t.Id, t.ProjectId, t.Endpoint, t.Duration, t.RecordedAt, t.StatusCode, t.BodySize, t.ClientIP); err != nil {
+		scopeJSON := "{}"
+		if t.Scope != nil {
+			if scopeBytes, err := json.Marshal(t.Scope); err == nil {
+				scopeJSON = string(scopeBytes)
+			}
+		}
+		if err := batch.Append(t.Id, t.ProjectId, t.Endpoint, t.Duration, t.RecordedAt, t.StatusCode, t.BodySize, t.ClientIP, scopeJSON); err != nil {
 			return err
 		}
 	}
@@ -48,7 +55,7 @@ func (e *transactionRepository) FindAll(ctx context.Context, projectId string, f
 		orderBy = "recorded_at"
 	}
 
-	query := "SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip FROM transactions WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY " + orderBy + " DESC LIMIT ? OFFSET ?"
+	query := "SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, scope FROM transactions WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY " + orderBy + " DESC LIMIT ? OFFSET ?"
 	rows, err := (*chdb.Conn).Query(ctx, query, projectId, fromDate, toDate, pageSize, offset)
 	if err != nil {
 		return nil, 0, err
@@ -58,8 +65,15 @@ func (e *transactionRepository) FindAll(ctx context.Context, projectId string, f
 	var transactions []models.Transaction
 	for rows.Next() {
 		var t models.Transaction
-		if err := rows.Scan(&t.Id, &t.ProjectId, &t.Endpoint, &t.Duration, &t.RecordedAt, &t.StatusCode, &t.BodySize, &t.ClientIP); err != nil {
+		var scopeJSON string
+		if err := rows.Scan(&t.Id, &t.ProjectId, &t.Endpoint, &t.Duration, &t.RecordedAt, &t.StatusCode, &t.BodySize, &t.ClientIP, &scopeJSON); err != nil {
 			return nil, 0, err
+		}
+		// Parse scope JSON
+		if scopeJSON != "" && scopeJSON != "{}" {
+			if err := json.Unmarshal([]byte(scopeJSON), &t.Scope); err != nil {
+				t.Scope = nil
+			}
 		}
 		transactions = append(transactions, t)
 	}
@@ -77,16 +91,19 @@ func (e *transactionRepository) FindGroupedByEndpoint(ctx context.Context, proje
 
 	offset := (page - 1) * pageSize
 
-	allowedOrderBy := map[string]bool{
-		"count":        true,
-		"p50_duration": true,
-		"p95_duration": true,
-		"avg_duration": true,
-		"last_seen":    true,
+	// Map frontend field names to SQL expressions
+	orderByMap := map[string]string{
+		"count":        "count",
+		"p50_duration": "p50_duration",
+		"p95_duration": "p95_duration",
+		"avg_duration": "avg_duration",
+		"last_seen":    "last_seen",
+		"impact":       "count * (p95_duration - p50_duration)",
 	}
 
-	if !allowedOrderBy[orderBy] {
-		orderBy = "count"
+	orderExpr, ok := orderByMap[orderBy]
+	if !ok {
+		orderExpr = "impact" // Default to impact
 	}
 
 	query := `SELECT
@@ -99,7 +116,7 @@ func (e *transactionRepository) FindGroupedByEndpoint(ctx context.Context, proje
 	FROM transactions
 	WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?
 	GROUP BY endpoint
-	ORDER BY ` + orderBy + ` DESC
+	ORDER BY ` + orderExpr + ` DESC
 	LIMIT ? OFFSET ?`
 
 	rows, err := (*chdb.Conn).Query(ctx, query, projectId, fromDate, toDate, pageSize, offset)
@@ -144,7 +161,7 @@ func (e *transactionRepository) FindByEndpoint(ctx context.Context, projectId st
 		orderBy = "recorded_at"
 	}
 
-	query := "SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip FROM transactions WHERE project_id = ? AND endpoint = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY " + orderBy + " DESC LIMIT ? OFFSET ?"
+	query := "SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, scope FROM transactions WHERE project_id = ? AND endpoint = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY " + orderBy + " DESC LIMIT ? OFFSET ?"
 	rows, err := (*chdb.Conn).Query(ctx, query, projectId, endpoint, fromDate, toDate, pageSize, offset)
 	if err != nil {
 		return nil, 0, err
@@ -154,8 +171,15 @@ func (e *transactionRepository) FindByEndpoint(ctx context.Context, projectId st
 	var transactions []models.Transaction
 	for rows.Next() {
 		var t models.Transaction
-		if err := rows.Scan(&t.Id, &t.ProjectId, &t.Endpoint, &t.Duration, &t.RecordedAt, &t.StatusCode, &t.BodySize, &t.ClientIP); err != nil {
+		var scopeJSON string
+		if err := rows.Scan(&t.Id, &t.ProjectId, &t.Endpoint, &t.Duration, &t.RecordedAt, &t.StatusCode, &t.BodySize, &t.ClientIP, &scopeJSON); err != nil {
 			return nil, 0, err
+		}
+		// Parse scope JSON
+		if scopeJSON != "" && scopeJSON != "{}" {
+			if err := json.Unmarshal([]byte(scopeJSON), &t.Scope); err != nil {
+				t.Scope = nil
+			}
 		}
 		transactions = append(transactions, t)
 	}
@@ -167,7 +191,7 @@ func (e *transactionRepository) FindByEndpoint(ctx context.Context, projectId st
 func (e *transactionRepository) CountByHour(ctx context.Context, projectId string, start, end time.Time) ([]models.TimeSeriesPoint, error) {
 	query := `SELECT
 		toStartOfHour(recorded_at) as hour,
-		count() as count
+		toFloat64(count()) as count
 	FROM transactions
 	WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?
 	GROUP BY hour
@@ -245,6 +269,44 @@ func (e *transactionRepository) ErrorRateByHour(ctx context.Context, projectId s
 	}
 
 	return points, nil
+}
+
+// FindWorstEndpoints returns endpoints ordered by impact score (count * variance)
+// Higher call volume + larger variance = higher impact
+func (e *transactionRepository) FindWorstEndpoints(ctx context.Context, projectId string, start, end time.Time, limit int) ([]models.EndpointStats, error) {
+	query := `SELECT
+		endpoint,
+		count() as count,
+		quantile(0.5)(duration) as p50_duration,
+		quantile(0.95)(duration) as p95_duration,
+		avg(duration) as avg_duration,
+		max(recorded_at) as last_seen
+	FROM transactions
+	WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?
+	GROUP BY endpoint
+	ORDER BY count * (p95_duration - p50_duration) DESC
+	LIMIT ?`
+
+	rows, err := (*chdb.Conn).Query(ctx, query, projectId, start, end, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stats []models.EndpointStats
+	for rows.Next() {
+		var s models.EndpointStats
+		var p50, p95, avg float64
+		if err := rows.Scan(&s.Endpoint, &s.Count, &p50, &p95, &avg, &s.LastSeen); err != nil {
+			return nil, err
+		}
+		s.P50Duration = time.Duration(p50)
+		s.P95Duration = time.Duration(p95)
+		s.AvgDuration = time.Duration(avg)
+		stats = append(stats, s)
+	}
+
+	return stats, nil
 }
 
 var TransactionRepository = transactionRepository{}

@@ -71,8 +71,7 @@ func (p projectController) CreateProject(c *gin.Context) {
 
 	project, err := repositories.ProjectRepository.Create(c, request.Name, request.Framework)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create project"})
-		return
+		panic(err)
 	}
 
 	// Add to cache

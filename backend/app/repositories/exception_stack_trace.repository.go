@@ -4,6 +4,7 @@ import (
 	"backend/app/chdb"
 	"backend/app/models"
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -13,12 +14,18 @@ var ErrExceptionNotFound = errors.New("exception not found")
 type exceptionStackTraceRepository struct{}
 
 func (e *exceptionStackTraceRepository) InsertAsync(ctx context.Context, lines []models.ExceptionStackTrace) error {
-	batch, err := (*chdb.Conn).PrepareBatch(ctx, "INSERT INTO exception_stack_traces (project_id, transaction_id, exception_hash, stack_trace, recorded_at)")
+	batch, err := (*chdb.Conn).PrepareBatch(ctx, "INSERT INTO exception_stack_traces (project_id, transaction_id, exception_hash, stack_trace, recorded_at, scope)")
 	if err != nil {
 		return err
 	}
 	for _, est := range lines {
-		if err := batch.Append(est.ProjectId, est.TransactionId, est.ExceptionHash, est.StackTrace, est.RecordedAt); err != nil {
+		scopeJSON := "{}"
+		if est.Scope != nil {
+			if scopeBytes, err := json.Marshal(est.Scope); err == nil {
+				scopeJSON = string(scopeBytes)
+			}
+		}
+		if err := batch.Append(est.ProjectId, est.TransactionId, est.ExceptionHash, est.StackTrace, est.RecordedAt, scopeJSON); err != nil {
 			return err
 		}
 	}
@@ -96,9 +103,9 @@ func (e *exceptionStackTraceRepository) FindByHash(ctx context.Context, projectI
 		return nil, nil, 0, ErrExceptionNotFound
 	}
 
-	// Get individual occurrences with pagination
+	// Get individual occurrences with pagination (including scope)
 	rows, err := (*chdb.Conn).Query(ctx,
-		"SELECT project_id, transaction_id, exception_hash, stack_trace, recorded_at FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ? ORDER BY recorded_at DESC LIMIT ? OFFSET ?",
+		"SELECT project_id, transaction_id, exception_hash, stack_trace, recorded_at, scope FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ? ORDER BY recorded_at DESC LIMIT ? OFFSET ?",
 		projectId, exceptionHash, pageSize, offset)
 	if err != nil {
 		return nil, nil, 0, err
@@ -108,8 +115,15 @@ func (e *exceptionStackTraceRepository) FindByHash(ctx context.Context, projectI
 	var occurrences []models.ExceptionStackTrace
 	for rows.Next() {
 		var o models.ExceptionStackTrace
-		if err := rows.Scan(&o.ProjectId, &o.TransactionId, &o.ExceptionHash, &o.StackTrace, &o.RecordedAt); err != nil {
+		var scopeJSON string
+		if err := rows.Scan(&o.ProjectId, &o.TransactionId, &o.ExceptionHash, &o.StackTrace, &o.RecordedAt, &scopeJSON); err != nil {
 			return nil, nil, 0, err
+		}
+		// Parse scope JSON
+		if scopeJSON != "" && scopeJSON != "{}" {
+			if err := json.Unmarshal([]byte(scopeJSON), &o.Scope); err != nil {
+				o.Scope = nil // If parsing fails, leave scope as nil
+			}
 		}
 		occurrences = append(occurrences, o)
 	}
@@ -121,7 +135,7 @@ func (e *exceptionStackTraceRepository) FindByHash(ctx context.Context, projectI
 func (e *exceptionStackTraceRepository) CountByHour(ctx context.Context, projectId string, start, end time.Time) ([]models.TimeSeriesPoint, error) {
 	query := `SELECT
 		toStartOfHour(recorded_at) as hour,
-		count() as count
+		toFloat64(count()) as count
 	FROM exception_stack_traces
 	WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?
 	GROUP BY hour
