@@ -134,15 +134,14 @@
 	<div class="space-y-8">
 		<!-- Endpoints -->
 		<div>
-			<div class="flex items-center gap-3 mb-4">
-				<div class="flex h-8 w-8 items-center justify-center rounded-md bg-chart-1/10">
+			<div class="flex items-bottom gap-1 mb-4">
+				<div class="flex h-8 w-8 items-center justify-center rounded-md bg-chart-1/10 mr-2">
 					<Gauge class="h-5 w-5 text-chart-1" />
 				</div>
 				<h2 class="text-2xl font-bold tracking-tight">Endpoints</h2>
 				<Tooltip.Root>
-					<Tooltip.Trigger>
-
-						<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
+					<Tooltip.Trigger class="pt-1">
+						<CircleQuestionMark class="h-4 w-4 text-muted-foreground/60" />
 					</Tooltip.Trigger>
 					<Tooltip.Content>
 						<p>Most impactful endpoints to optimize based on traffic and response time variance</p>
@@ -277,16 +276,14 @@
 
 		<!-- Issues Section -->
 		<div>
-			<div class="flex items-center gap-3 mb-4">
-				<div class="flex h-8 w-8 items-center justify-center rounded-md bg-destructive/10">
+			<div class="flex items-center gap-1 mb-4">
+				<div class="flex h-8 w-8 items-center justify-center rounded-md bg-destructive/10 mr-2">
 					<Bug class="h-5 w-5 text-destructive" />
 				</div>
 				<h2 class="text-2xl font-bold tracking-tight">Issues</h2>
 				<Tooltip.Root>
-					<Tooltip.Trigger>
-						<div class="flex h-4 w-4 items-center justify-center rounded-full bg-muted-foreground/20">
-							<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-						</div>
+					<Tooltip.Trigger class="pt-1">
+						<CircleQuestionMark class="h-4 w-4 text-muted-foreground/60" />
 					</Tooltip.Trigger>
 					<Tooltip.Content>
 						<p>Latest exceptions and errors to address from the last 24 hours</p>
