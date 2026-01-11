@@ -9,6 +9,9 @@ type ExceptionStackTrace struct {
 	StackTrace    string            `json:"stackTrace" ch:"stack_trace"`
 	RecordedAt    time.Time         `json:"recordedAt" ch:"recorded_at"`
 	Scope         map[string]string `json:"scope" ch:"scope"`
+	AppVersion    string            `json:"appVersion" ch:"app_version"`
+	ServerName    string            `json:"serverName" ch:"server_name"`
+	IsMessage     bool              `json:"isMessage" ch:"is_message"`
 }
 
 type ExceptionTrendPoint struct {

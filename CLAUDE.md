@@ -134,6 +134,18 @@ CLICKHOUSE_TLS=false
 - `metric_records` - Time-series system metrics
 - `exception_stack_traces` - Exceptions with hash grouping
 
+### Database Migrations
+**Important**:
+- Each migration file must contain exactly ONE SQL statement
+- Only create `.up.sql` files (no down migrations)
+- Each migration must have a unique numbered name
+
+Example - Adding two columns requires two separate migrations:
+```
+0013_add_app_version_to_transactions.up.sql   # ALTER TABLE ... ADD COLUMN app_version
+0014_add_server_name_to_transactions.up.sql   # ALTER TABLE ... ADD COLUMN server_name
+```
+
 ### Exception Hash Normalization
 The backend normalizes stack traces before hashing:
 - Removes error message content (keeps type only)

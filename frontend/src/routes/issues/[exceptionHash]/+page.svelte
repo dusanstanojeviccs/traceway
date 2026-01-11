@@ -25,6 +25,9 @@
         stackTrace: string;
         recordedAt: string;
         scope: Record<string, string> | null;
+        appVersion: string;
+        serverName: string;
+        isMessage: boolean;
     };
 
     let group = $state<ExceptionGroup | null>(null);
@@ -36,6 +39,9 @@
 
     // Get scope from the most recent occurrence for display
     const latestScope = $derived(occurrences[0]?.scope);
+    const latestAppVersion = $derived(occurrences[0]?.appVersion);
+    const latestServerName = $derived(occurrences[0]?.serverName);
+    const isMessage = $derived(occurrences[0]?.isMessage ?? false);
     const hasMoreOccurrences = $derived(total > 10);
 
     async function loadData() {
@@ -132,11 +138,24 @@
         <!-- Summary Card -->
         <Card.Root>
             <Card.Header>
-                <Card.Title>Exception Details</Card.Title>
+                <div class="flex items-center gap-2">
+                    <Card.Title>Exception Details</Card.Title>
+                    {#if isMessage}
+                        <span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-700/10 dark:ring-blue-400/30">
+                            Message
+                        </span>
+                    {/if}
+                </div>
                 <Card.Description>
                     First seen: {new Date(group.firstSeen).toLocaleString()} ·
                     Last seen: {new Date(group.lastSeen).toLocaleString()} ·
                     Occurrences: {group.count}
+                    {#if latestAppVersion}
+                        · Version: {latestAppVersion}
+                    {/if}
+                    {#if latestServerName}
+                        · Server: {latestServerName}
+                    {/if}
                 </Card.Description>
             </Card.Header>
             <Card.Content>

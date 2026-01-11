@@ -67,7 +67,7 @@
     const daysBackLabel = $derived(daysOptions.find(o => o.value === daysBack)?.label ?? "Select period");
     const pageSizeLabel = $derived(pageSizeOptions.find(o => o.value === pageSize.toString())?.label ?? pageSize.toString());
 
-    
+
     async function loadData() {
         loading = true;
         error = '';

@@ -10,15 +10,19 @@ type ClientExceptionStackTrace struct {
 	StackTrace    string            `json:"stackTrace"`
 	RecordedAt    time.Time         `json:"recordedAt"`
 	Scope         map[string]string `json:"scope"`
+	IsMessage     bool              `json:"isMessage"`
 }
 
-func (c *ClientExceptionStackTrace) ToExceptionStackTrace(exceptionHash string) models.ExceptionStackTrace {
+func (c *ClientExceptionStackTrace) ToExceptionStackTrace(exceptionHash, appVersion, serverName string) models.ExceptionStackTrace {
 	return models.ExceptionStackTrace{
 		ExceptionHash: exceptionHash,
 		TransactionId: c.TransactionId,
 		StackTrace:    c.StackTrace,
 		RecordedAt:    c.RecordedAt,
 		Scope:         c.Scope,
+		IsMessage:     c.IsMessage,
+		AppVersion:    appVersion,
+		ServerName:    serverName,
 	}
 }
 
@@ -47,7 +51,7 @@ type ClientTransaction struct {
 	Scope      map[string]string `json:"scope"`
 }
 
-func (c *ClientTransaction) ToTransaction() models.Transaction {
+func (c *ClientTransaction) ToTransaction(appVersion, serverName string) models.Transaction {
 	return models.Transaction{
 		Id:         c.Id,
 		Endpoint:   c.Endpoint,
@@ -57,6 +61,8 @@ func (c *ClientTransaction) ToTransaction() models.Transaction {
 		BodySize:   int32(c.BodySize),
 		ClientIP:   c.ClientIP,
 		Scope:      c.Scope,
+		AppVersion: appVersion,
+		ServerName: serverName,
 	}
 }
 

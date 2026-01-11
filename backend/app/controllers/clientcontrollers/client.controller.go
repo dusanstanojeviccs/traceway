@@ -17,8 +17,9 @@ import (
 type clientController struct{}
 
 type ReportRequest struct {
-	App              string                          `json:"app"`
 	CollectionFrames []*clientmodels.CollectionFrame `json:"collectionFrames"`
+	AppVersion       string                          `json:"appVersion"`
+	ServerName       string                          `json:"serverName"`
 }
 
 func (e clientController) Report(c *gin.Context) {
@@ -37,13 +38,13 @@ func (e clientController) Report(c *gin.Context) {
 	metricRecordsToInsert := []models.MetricRecord{}
 	for _, cf := range request.CollectionFrames {
 		for _, ct := range cf.Transactions {
-			t := ct.ToTransaction()
+			t := ct.ToTransaction(request.AppVersion, request.ServerName)
 			t.ProjectId = projectId
 			transactionsToInsert = append(transactionsToInsert, t)
 		}
 
 		for _, cst := range cf.StackTraces {
-			est := cst.ToExceptionStackTrace(computeExceptionHash(cst.StackTrace))
+			est := cst.ToExceptionStackTrace(computeExceptionHash(cst.StackTrace), request.AppVersion, request.ServerName)
 			est.ProjectId = projectId
 			exceptionStackTraceToInsert = append(exceptionStackTraceToInsert, est)
 		}

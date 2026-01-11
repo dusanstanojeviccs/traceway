@@ -19,7 +19,6 @@ func testGin() {
 	router := gin.Default()
 
 	router.Use(tracewaygin.New(
-		"tracewaydemo",
 		"default_token_change_me@http://localhost:8082/api/report",
 		traceway.WithDebug(true),
 	))

@@ -13,6 +13,8 @@ type Transaction struct {
 	BodySize   int32             `json:"bodySize" ch:"body_size"`
 	ClientIP   string            `json:"clientIP" ch:"client_ip"`
 	Scope      map[string]string `json:"scope" ch:"scope"`
+	AppVersion string            `json:"appVersion" ch:"app_version"`
+	ServerName string            `json:"serverName" ch:"server_name"`
 }
 
 type EndpointStats struct {

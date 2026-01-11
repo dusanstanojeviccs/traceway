@@ -51,8 +51,8 @@ func wrapAndExecute(c *gin.Context) (s *string) {
 	return nil
 }
 
-func New(app, connectionString string, options ...func(*traceway.TracewayOptions)) gin.HandlerFunc {
-	traceway.Init(app, connectionString, options...)
+func New(connectionString string, options ...func(*traceway.TracewayOptions)) gin.HandlerFunc {
+	traceway.Init(connectionString, options...)
 	initCachedValues()
 
 	return func(c *gin.Context) {

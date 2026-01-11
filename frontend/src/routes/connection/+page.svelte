@@ -50,7 +50,7 @@
 
     // Framework-specific code snippets
     function getFrameworkCode(framework: Framework, token: string): string {
-        const tokenValue = token || 'YOUR_PROJECT_TOKEN';
+        const connectionString = token ? `${token}@http://localhost:8082/api/client/report` : 'YOUR_TOKEN@http://localhost:8082/api/client/report';
 
         switch (framework) {
             case 'gin':
@@ -58,188 +58,82 @@
 
 import (
     "github.com/gin-gonic/gin"
-    "github.com/tracewayapp/traceway-go"
+    "github.com/traceway-io/go-client"
+    "github.com/traceway-io/go-client/traceway_gin"
 )
 
 func main() {
-    // Initialize Traceway client
-    tw := traceway.New(traceway.Config{
-        Token:     "${tokenValue}",
-        ServerURL: "http://localhost:8082", // Your Traceway server
-    })
-    defer tw.Close()
+    r := gin.Default()
 
-    // Create Gin router
-    router := gin.Default()
-
-    // Add Traceway middleware
-    router.Use(tw.GinMiddleware())
+    // Add Traceway middleware with optional version and server name
+    r.Use(traceway_gin.New(
+        "${connectionString}",
+        traceway.WithVersion("1.0.0"),        // Optional: your app version
+        traceway.WithServerName("api-server"), // Optional: defaults to hostname
+    ))
 
     // Your routes
-    router.GET("/", func(c *gin.Context) {
+    r.GET("/", func(c *gin.Context) {
         c.JSON(200, gin.H{"message": "Hello World"})
     })
 
-    router.Run(":8080")
+    // Capture custom messages
+    r.GET("/action", func(c *gin.Context) {
+        traceway.CaptureMessage("User performed action")
+        c.JSON(200, gin.H{"status": "ok"})
+    })
+
+    r.Run(":8080")
 }`;
 
             case 'fiber':
-                return `package main
-
-import (
-    "github.com/gofiber/fiber/v2"
-    "github.com/tracewayapp/traceway-go"
-)
-
-func main() {
-    // Initialize Traceway client
-    tw := traceway.New(traceway.Config{
-        Token:     "${tokenValue}",
-        ServerURL: "http://localhost:8082", // Your Traceway server
-    })
-    defer tw.Close()
-
-    // Create Fiber app
-    app := fiber.New()
-
-    // Add Traceway middleware
-    app.Use(tw.FiberMiddleware())
-
-    // Your routes
-    app.Get("/", func(c *fiber.Ctx) error {
-        return c.JSON(fiber.Map{"message": "Hello World"})
-    })
-
-    app.Listen(":8080")
-}`;
-
             case 'chi':
-                return `package main
-
-import (
-    "encoding/json"
-    "net/http"
-
-    "github.com/go-chi/chi/v5"
-    "github.com/tracewayapp/traceway-go"
-)
-
-func main() {
-    // Initialize Traceway client
-    tw := traceway.New(traceway.Config{
-        Token:     "${tokenValue}",
-        ServerURL: "http://localhost:8082", // Your Traceway server
-    })
-    defer tw.Close()
-
-    // Create Chi router
-    r := chi.NewRouter()
-
-    // Add Traceway middleware
-    r.Use(tw.ChiMiddleware())
-
-    // Your routes
-    r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-        json.NewEncoder(w).Encode(map[string]string{"message": "Hello World"})
-    })
-
-    http.ListenAndServe(":8080", r)
-}`;
-
             case 'fasthttp':
-                return `package main
-
-import (
-    "github.com/valyala/fasthttp"
-    "github.com/tracewayapp/traceway-go"
-)
-
-func main() {
-    // Initialize Traceway client
-    tw := traceway.New(traceway.Config{
-        Token:     "${tokenValue}",
-        ServerURL: "http://localhost:8082", // Your Traceway server
-    })
-    defer tw.Close()
-
-    // Request handler
-    handler := func(ctx *fasthttp.RequestCtx) {
-        ctx.SetContentType("application/json")
-        ctx.WriteString(\`{"message": "Hello World"}\`)
-    }
-
-    // Wrap with Traceway middleware
-    wrappedHandler := tw.FastHTTPMiddleware(handler)
-
-    fasthttp.ListenAndServe(":8080", wrappedHandler)
-}`;
-
             case 'stdlib':
-                return `package main
-
-import (
-    "encoding/json"
-    "net/http"
-
-    "github.com/tracewayapp/traceway-go"
-)
-
-func main() {
-    // Initialize Traceway client
-    tw := traceway.New(traceway.Config{
-        Token:     "${tokenValue}",
-        ServerURL: "http://localhost:8082", // Your Traceway server
-    })
-    defer tw.Close()
-
-    // Create a new ServeMux
-    mux := http.NewServeMux()
-
-    // Your routes
-    mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        json.NewEncoder(w).Encode(map[string]string{"message": "Hello World"})
-    })
-
-    // Wrap with Traceway middleware
-    handler := tw.HTTPMiddleware(mux)
-
-    http.ListenAndServe(":8080", handler)
-}`;
-
             case 'custom':
             default:
-                return `package main
+                return `// This framework is not currently supported.
+//
+// We welcome contributions! Please visit our GitHub repository
+// to help implement support for ${framework === 'custom' ? 'custom frameworks' : framework}:
+//
+// https://github.com/traceway-io/go-client
+//
+// In the meantime, you can use the core SDK directly:
+
+package main
 
 import (
-    "github.com/tracewayapp/traceway-go"
+    "github.com/traceway-io/go-client"
 )
 
 func main() {
-    // Initialize Traceway client
-    tw := traceway.New(traceway.Config{
-        Token:     "${tokenValue}",
-        ServerURL: "http://localhost:8082", // Your Traceway server
-    })
-    defer tw.Close()
+    // Initialize Traceway
+    traceway.Init(
+        "${connectionString}",
+        traceway.WithVersion("1.0.0"),
+        traceway.WithServerName("my-server"),
+    )
 
-    // Manual instrumentation example
-    // Use tw.StartTransaction() and tw.EndTransaction() to track requests
-    // See documentation for your specific framework integration
+    // Capture exceptions manually
+    // traceway.CaptureException(err)
+    // traceway.CaptureExceptionWithContext(ctx, err)
+
+    // Capture messages
+    // traceway.CaptureMessage("Something happened")
+    // traceway.CaptureMessageWithContext(ctx, "Something happened")
 }`;
         }
     }
 
     function getInstallCommand(framework: Framework): string {
-        const base = 'go get github.com/tracewayapp/traceway-go';
+        const base = 'go get github.com/traceway-io/go-client';
         switch (framework) {
             case 'gin':
                 return `${base}\ngo get github.com/gin-gonic/gin`;
             case 'fiber':
-                return `${base}\ngo get github.com/gofiber/fiber/v2`;
             case 'chi':
-                return `${base}\ngo get github.com/go-chi/chi/v5`;
             case 'fasthttp':
-                return `${base}\ngo get github.com/valyala/fasthttp`;
             case 'stdlib':
             case 'custom':
             default:
@@ -268,7 +162,7 @@ func main() {
     const installCommand = $derived(
         projectWithToken
             ? getInstallCommand(projectWithToken.framework)
-            : 'go get github.com/tracewayapp/traceway-go'
+            : 'go get github.com/traceway-io/go-client'
     );
 
     async function copyCode() {

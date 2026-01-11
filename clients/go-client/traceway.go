@@ -216,6 +216,7 @@ type ExceptionStackTrace struct {
 	StackTrace    string            `json:"stackTrace"`
 	RecordedAt    time.Time         `json:"recordedAt"`
 	Scope         map[string]string `json:"scope,omitempty"`
+	IsMessage     bool              `json:"isMessage"`
 }
 
 type MetricRecord struct {
@@ -273,7 +274,6 @@ type CollectionFrameStore struct {
 	lastUploadStarted *time.Time
 
 	// Config fields
-	app                 string
 	apiUrl              string
 	token               string
 	debug               bool
@@ -281,10 +281,11 @@ type CollectionFrameStore struct {
 	collectionInterval  time.Duration
 	uploadTimeout       time.Duration
 	metricsInterval     time.Duration
+	version             string
+	serverName          string
 }
 
 func InitCollectionFrameStore(
-	app string,
 	apiUrl string,
 	token string,
 	debug bool,
@@ -292,6 +293,8 @@ func InitCollectionFrameStore(
 	collectionInterval time.Duration,
 	uploadTimeout time.Duration,
 	metricsInterval time.Duration,
+	version string,
+	serverName string,
 ) *CollectionFrameStore {
 	store := &CollectionFrameStore{
 		current:      nil,
@@ -300,7 +303,6 @@ func InitCollectionFrameStore(
 		stopCh:       make(chan struct{}),
 		messageQueue: make(chan CollectionFrameMessage),
 
-		app:    app,
 		apiUrl: apiUrl,
 		token:  token,
 		debug:  debug,
@@ -309,6 +311,8 @@ func InitCollectionFrameStore(
 		collectionInterval:  collectionInterval,
 		uploadTimeout:       uploadTimeout,
 		metricsInterval:     metricsInterval,
+		version:             version,
+		serverName:          serverName,
 	}
 
 	store.wg.Add(1)
@@ -441,8 +445,9 @@ func (s *CollectionFrameStore) triggerUpload(framesToSend []*CollectionFrame) {
 	}()
 
 	jsonData, err := json.Marshal(gin.H{
-		"app":              s.app,
 		"collectionFrames": framesToSend,
+		"appVersion":       s.version,
+		"serverName":       s.serverName,
 	})
 	if err != nil {
 		if s.debug {
@@ -520,6 +525,8 @@ type TracewayOptions struct {
 	collectionInterval  time.Duration
 	uploadTimeout       time.Duration
 	metricsInterval     time.Duration
+	version             string
+	serverName          string
 }
 
 func NewTracewayOptions(options ...func(*TracewayOptions)) *TracewayOptions {
@@ -528,6 +535,8 @@ func NewTracewayOptions(options ...func(*TracewayOptions)) *TracewayOptions {
 		collectionInterval:  5 * time.Second,
 		uploadTimeout:       2 * time.Second,
 		metricsInterval:     30 * time.Second,
+		version:             "",
+		serverName:          getHostname(),
 	}
 	for _, o := range options {
 		o(svr)
@@ -556,11 +565,21 @@ func WithUploadTimeout(val time.Duration) func(*TracewayOptions) {
 }
 func WithMetricsInterval(val time.Duration) func(*TracewayOptions) {
 	return func(s *TracewayOptions) {
-		s.collectionInterval = val
+		s.metricsInterval = val
+	}
+}
+func WithVersion(val string) func(*TracewayOptions) {
+	return func(s *TracewayOptions) {
+		s.version = val
+	}
+}
+func WithServerName(val string) func(*TracewayOptions) {
+	return func(s *TracewayOptions) {
+		s.serverName = val
 	}
 }
 
-func Init(app, connectionString string, options ...func(*TracewayOptions)) error {
+func Init(connectionString string, options ...func(*TracewayOptions)) error {
 	if collectionFrameStore != nil {
 		return fmt.Errorf("Second Traceway initialization detected")
 	}
@@ -572,7 +591,6 @@ func Init(app, connectionString string, options ...func(*TracewayOptions)) error
 	tracewayOptions := NewTracewayOptions(options...)
 
 	collectionFrameStore = InitCollectionFrameStore(
-		app,
 		apiUrl,
 		token,
 		tracewayOptions.debug,
@@ -580,6 +598,8 @@ func Init(app, connectionString string, options ...func(*TracewayOptions)) error
 		tracewayOptions.collectionInterval,
 		tracewayOptions.uploadTimeout,
 		tracewayOptions.metricsInterval,
+		tracewayOptions.version,
+		tracewayOptions.serverName,
 	)
 	return nil
 }
@@ -705,5 +725,37 @@ func RecoverWithContext(ctx context.Context) {
 				Scope:         scope.GetTags(),
 			},
 		}
+	}
+}
+
+// CaptureMessage captures a message as an exception with minimal stack trace
+func CaptureMessage(msg string) {
+	CaptureMessageWithContext(context.Background(), msg)
+}
+
+// CaptureMessageWithContext captures a message with context as an exception
+func CaptureMessageWithContext(ctx context.Context, msg string) {
+	if collectionFrameStore == nil {
+		return
+	}
+
+	_, file, line, ok := runtime.Caller(1)
+	if !ok {
+		file = "unknown"
+		line = 0
+	}
+
+	stackTrace := fmt.Sprintf("Message: %s\n    at %s:%d", msg, file, line)
+
+	scope := GetScopeFromContext(ctx)
+	collectionFrameStore.messageQueue <- CollectionFrameMessage{
+		msgType: CollectionFrameMessageTypeException,
+		exceptionStackTrace: &ExceptionStackTrace{
+			TransactionId: GetTransactionIdFromContext(ctx),
+			StackTrace:    stackTrace,
+			RecordedAt:    time.Now(),
+			Scope:         scope.GetTags(),
+			IsMessage:     true,
+		},
 	}
 }

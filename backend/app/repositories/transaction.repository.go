@@ -11,7 +11,7 @@ import (
 type transactionRepository struct{}
 
 func (e *transactionRepository) InsertAsync(ctx context.Context, lines []models.Transaction) error {
-	batch, err := (*chdb.Conn).PrepareBatch(ctx, "INSERT INTO transactions (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, scope)")
+	batch, err := (*chdb.Conn).PrepareBatch(ctx, "INSERT INTO transactions (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, scope, app_version, server_name)")
 	if err != nil {
 		return err
 	}
@@ -22,7 +22,7 @@ func (e *transactionRepository) InsertAsync(ctx context.Context, lines []models.
 				scopeJSON = string(scopeBytes)
 			}
 		}
-		if err := batch.Append(t.Id, t.ProjectId, t.Endpoint, t.Duration, t.RecordedAt, t.StatusCode, t.BodySize, t.ClientIP, scopeJSON); err != nil {
+		if err := batch.Append(t.Id, t.ProjectId, t.Endpoint, t.Duration, t.RecordedAt, t.StatusCode, t.BodySize, t.ClientIP, scopeJSON, t.AppVersion, t.ServerName); err != nil {
 			return err
 		}
 	}
@@ -55,7 +55,7 @@ func (e *transactionRepository) FindAll(ctx context.Context, projectId string, f
 		orderBy = "recorded_at"
 	}
 
-	query := "SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, scope FROM transactions WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY " + orderBy + " DESC LIMIT ? OFFSET ?"
+	query := "SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, scope, app_version, server_name FROM transactions WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY " + orderBy + " DESC LIMIT ? OFFSET ?"
 	rows, err := (*chdb.Conn).Query(ctx, query, projectId, fromDate, toDate, pageSize, offset)
 	if err != nil {
 		return nil, 0, err
@@ -66,7 +66,7 @@ func (e *transactionRepository) FindAll(ctx context.Context, projectId string, f
 	for rows.Next() {
 		var t models.Transaction
 		var scopeJSON string
-		if err := rows.Scan(&t.Id, &t.ProjectId, &t.Endpoint, &t.Duration, &t.RecordedAt, &t.StatusCode, &t.BodySize, &t.ClientIP, &scopeJSON); err != nil {
+		if err := rows.Scan(&t.Id, &t.ProjectId, &t.Endpoint, &t.Duration, &t.RecordedAt, &t.StatusCode, &t.BodySize, &t.ClientIP, &scopeJSON, &t.AppVersion, &t.ServerName); err != nil {
 			return nil, 0, err
 		}
 		// Parse scope JSON
@@ -173,7 +173,7 @@ func (e *transactionRepository) FindByEndpoint(ctx context.Context, projectId st
 		sortDir = "ASC"
 	}
 
-	query := "SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, scope FROM transactions WHERE project_id = ? AND endpoint = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY " + orderBy + " " + sortDir + " LIMIT ? OFFSET ?"
+	query := "SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, scope, app_version, server_name FROM transactions WHERE project_id = ? AND endpoint = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY " + orderBy + " " + sortDir + " LIMIT ? OFFSET ?"
 	rows, err := (*chdb.Conn).Query(ctx, query, projectId, endpoint, fromDate, toDate, pageSize, offset)
 	if err != nil {
 		return nil, 0, err
@@ -184,7 +184,7 @@ func (e *transactionRepository) FindByEndpoint(ctx context.Context, projectId st
 	for rows.Next() {
 		var t models.Transaction
 		var scopeJSON string
-		if err := rows.Scan(&t.Id, &t.ProjectId, &t.Endpoint, &t.Duration, &t.RecordedAt, &t.StatusCode, &t.BodySize, &t.ClientIP, &scopeJSON); err != nil {
+		if err := rows.Scan(&t.Id, &t.ProjectId, &t.Endpoint, &t.Duration, &t.RecordedAt, &t.StatusCode, &t.BodySize, &t.ClientIP, &scopeJSON, &t.AppVersion, &t.ServerName); err != nil {
 			return nil, 0, err
 		}
 		// Parse scope JSON
