@@ -4,7 +4,7 @@
     import { api } from '$lib/api';
     import * as Table from "$lib/components/ui/table";
     import { Button } from "$lib/components/ui/button";
-    import { Skeleton } from "$lib/components/ui/skeleton";
+    import { LoadingCircle } from "$lib/components/ui/loading-circle";
     import * as Select from "$lib/components/ui/select";
     import { ArrowUpDown, ArrowDown, ArrowUp } from "@lucide/svelte";
     import { TimeRangePicker } from "$lib/components/ui/time-range-picker";
@@ -198,7 +198,33 @@
     <!-- Endpoints Table -->
     <div class="rounded-md border overflow-hidden">
         <Table.Root>
-            {#if loading || endpoints.length > 0}
+            {#if loading}
+            <Table.Body>
+                <Table.Row>
+                    <Table.Cell colspan={5} class="h-48">
+                        <div class="flex justify-center items-center h-full">
+                            <LoadingCircle size="lg" />
+                        </div>
+                    </Table.Cell>
+                </Table.Row>
+            </Table.Body>
+            {:else if error}
+            <Table.Body>
+                <Table.Row>
+                    <Table.Cell colspan={5} class="h-24 text-center text-red-500">
+                        {error}
+                    </Table.Cell>
+                </Table.Row>
+            </Table.Body>
+            {:else if endpoints.length === 0}
+            <Table.Body>
+                <Table.Row>
+                    <Table.Cell colspan={5} class="h-24 text-center text-muted-foreground">
+                        No transaction data received yet
+                    </Table.Cell>
+                </Table.Row>
+            </Table.Body>
+            {:else}
             <Table.Header>
                 <Table.Row>
                     <Table.Head>Endpoint</Table.Head>
@@ -280,56 +306,32 @@
                     </Table.Head>
                 </Table.Row>
             </Table.Header>
-            {/if}
             <Table.Body>
-                {#if loading}
-                    {#each Array(5) as _}
-                        <Table.Row>
-                            <Table.Cell><Skeleton class="h-4 w-[250px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[50px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[60px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[60px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[30px]" /></Table.Cell>
-                        </Table.Row>
-                    {/each}
-                {:else if error}
-                    <Table.Row>
-                        <Table.Cell colspan={5} class="h-24 text-center text-red-500">
-                            {error}
+                {#each endpoints as endpoint}
+                    {@const impact = getImpactIndicator(endpoint.count, endpoint.p50Duration, endpoint.p95Duration)}
+                    <Table.Row
+                        class="cursor-pointer hover:bg-muted/50"
+                        onclick={() => navigateToEndpoint(endpoint.endpoint)}
+                    >
+                        <Table.Cell class="font-mono text-sm">
+                            {endpoint.endpoint}
+                        </Table.Cell>
+                        <Table.Cell class="tabular-nums">
+                            {formatCount(endpoint.count)}
+                        </Table.Cell>
+                        <Table.Cell class="font-mono text-sm tabular-nums">
+                            {formatDuration(endpoint.p50Duration)}
+                        </Table.Cell>
+                        <Table.Cell class="font-mono text-sm tabular-nums">
+                            {formatDuration(endpoint.p95Duration)}
+                        </Table.Cell>
+                        <Table.Cell class="font-mono text-sm tabular-nums">
+                            <span class={impact.class}>{impact.text}</span>
                         </Table.Cell>
                     </Table.Row>
-                {:else if endpoints.length === 0}
-                    <Table.Row>
-                        <Table.Cell colspan={5} class="h-24 text-center text-muted-foreground">
-                            No transaction data received yet
-                        </Table.Cell>
-                    </Table.Row>
-                {:else}
-                    {#each endpoints as endpoint}
-                        {@const impact = getImpactIndicator(endpoint.count, endpoint.p50Duration, endpoint.p95Duration)}
-                        <Table.Row
-                            class="cursor-pointer hover:bg-muted/50"
-                            onclick={() => navigateToEndpoint(endpoint.endpoint)}
-                        >
-                            <Table.Cell class="font-mono text-sm">
-                                {endpoint.endpoint}
-                            </Table.Cell>
-                            <Table.Cell class="tabular-nums">
-                                {formatCount(endpoint.count)}
-                            </Table.Cell>
-                            <Table.Cell class="font-mono text-sm tabular-nums">
-                                {formatDuration(endpoint.p50Duration)}
-                            </Table.Cell>
-                            <Table.Cell class="font-mono text-sm tabular-nums">
-                                {formatDuration(endpoint.p95Duration)}
-                            </Table.Cell>
-                            <Table.Cell class="font-mono text-sm tabular-nums">
-                                <span class={impact.class}>{impact.text}</span>
-                            </Table.Cell>
-                        </Table.Row>
-                    {/each}
-                {/if}
+                {/each}
             </Table.Body>
+            {/if}
         </Table.Root>
     </div>
 

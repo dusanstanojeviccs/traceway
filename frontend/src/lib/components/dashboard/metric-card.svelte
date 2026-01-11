@@ -45,10 +45,10 @@
 			return Math.round(value).toString();
 		}
 
-		// Memory (MB)
+		// Memory (MB) - convert to GB for large values
 		if (unit === 'MB') {
-			if (value >= 1024) return (value / 1024).toFixed(1);
-			return Math.round(value).toString();
+			if (value >= 1024) return (value / 1024).toFixed(1) + ' GB';
+			return Math.round(value).toString() + ' MB';
 		}
 
 		// Default: round to 1 decimal
@@ -162,7 +162,7 @@
 			{metric.name}
 		</Card.Title>
 		<div class="text-2xl font-bold">
-			{formattedValue}{#if metric.unit}<span class="ml-1 text-lg text-muted-foreground"
+			{formattedValue}{#if metric.unit && metric.unit !== 'MB'}<span class="ml-1 text-lg text-muted-foreground"
 					>{metric.unit}</span
 				>{/if}
 		</div>

@@ -323,13 +323,13 @@ func InitCollectionFrameStore(
 }
 
 const (
-	MetricNameMemoryUsage     = "mem.used"
-	MetricNameMemoryUsagePcnt = "mem.used_pcnt"
-	MetricNameCpuUsage        = "cpu.used_pcnt"
-	MetricNameGoRoutines      = "go.go_routines"
-	MetricNameHeapObjects     = "go.heap_objects"
-	MetricNameNumGC           = "go.num_gc"
-	MetricNameGCPauseTotal    = "go.gc_pause"
+	MetricNameMemoryUsage  = "mem.used"
+	MetricNameMemoryTotal  = "mem.total"
+	MetricNameCpuUsage     = "cpu.used_pcnt"
+	MetricNameGoRoutines   = "go.go_routines"
+	MetricNameHeapObjects  = "go.heap_objects"
+	MetricNameNumGC        = "go.num_gc"
+	MetricNameGCPauseTotal = "go.gc_pause"
 )
 
 func (s *CollectionFrameStore) processMetrics() {
@@ -367,8 +367,8 @@ func (s *CollectionFrameStore) safeProcessMetrics() {
 
 	totalMem, err := mem.GetTotalMemory()
 	if err == nil && totalMem > 0 {
-		memPercent := (float64(m.Alloc) / float64(totalMem)) * 100
-		CaptureMetric(MetricNameMemoryUsagePcnt, memPercent)
+		// Convert bytes to MB for total system memory
+		CaptureMetric(MetricNameMemoryTotal, float64(totalMem)/1024/1024)
 	} else {
 		if s.debug {
 			log.Println("Traceway total mem not read", err)

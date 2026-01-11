@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import * as Table from '$lib/components/ui/table';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { ArrowRight, Info, Gauge, Bug, CircleQuestionMark } from 'lucide-svelte';
@@ -130,7 +130,11 @@
 		/>
 	{/if}
 
-	{#if !error}
+	{#if loading}
+		<div class="flex justify-center items-center py-20">
+			<LoadingCircle size="lg" />
+		</div>
+	{:else if !error}
 	<div class="space-y-8">
 		<!-- Endpoints -->
 		<div>
@@ -150,7 +154,7 @@
 			</div>
 			<div class="rounded-md border overflow-hidden">
 				<Table.Root>
-					{#if loading || (data?.worstEndpoints && data.worstEndpoints.length > 0)}
+					{#if data?.worstEndpoints && data.worstEndpoints.length > 0}
 					<Table.Header>
 						<Table.Row class="hover:bg-transparent">
 							<Table.Head class="h-10 text-sm">
@@ -220,58 +224,48 @@
 							</Table.Head>
 						</Table.Row>
 					</Table.Header>
-					{/if}
 					<Table.Body>
-						{#if loading}
-							{#each Array(4) as _}
-								<Table.Row>
-									<Table.Cell class="py-3"><Skeleton class="h-4 w-[150px]" /></Table.Cell>
-									<Table.Cell class="py-3 text-right"><Skeleton class="h-4 w-[35px] ml-auto" /></Table.Cell>
-									<Table.Cell class="py-3 text-right"><Skeleton class="h-4 w-[45px] ml-auto" /></Table.Cell>
-									<Table.Cell class="py-3 text-right"><Skeleton class="h-4 w-[45px] ml-auto" /></Table.Cell>
-									<Table.Cell class="py-3 text-right"><Skeleton class="h-4 w-[45px] ml-auto" /></Table.Cell>
-								</Table.Row>
-							{/each}
-						{:else if data?.worstEndpoints && data.worstEndpoints.length > 0}
-							{#each data.worstEndpoints as endpoint}
-								<Table.Row
-									class="cursor-pointer hover:bg-muted/50"
-									onclick={() => goto(`/transactions/${encodeURIComponent(endpoint.endpoint)}`)}
-								>
-									<Table.Cell class="py-3 font-mono text-sm truncate max-w-[300px]" title={endpoint.endpoint}>
-										{endpoint.endpoint}
-									</Table.Cell>
-									<Table.Cell class="py-3 text-right tabular-nums">
-										{endpoint.count.toLocaleString()}
-									</Table.Cell>
-									<Table.Cell class="py-3 text-right font-mono text-sm tabular-nums">
-										{formatDuration(endpoint.p50Duration)}
-									</Table.Cell>
-									<Table.Cell class="py-3 text-right font-mono text-sm tabular-nums">
-										{formatDuration(endpoint.p95Duration)}
-									</Table.Cell>
-									{@const impact = getImpactIndicator(endpoint.count, endpoint.p50Duration, endpoint.p95Duration)}
-									<Table.Cell class="py-3 text-right font-mono text-sm tabular-nums">
-										<span class={impact.class}>{impact.text}</span>
-									</Table.Cell>
-								</Table.Row>
-							{/each}
+						{#each data.worstEndpoints as endpoint}
 							<Table.Row
-								class="cursor-pointer bg-muted/50 hover:bg-muted"
-								onclick={() => goto('/transactions')}
+								class="cursor-pointer hover:bg-muted/50"
+								onclick={() => goto(`/transactions/${encodeURIComponent(endpoint.endpoint)}`)}
 							>
-								<Table.Cell colspan={5} class="py-2 text-center text-sm text-muted-foreground">
-									View all transactions <ArrowRight class="inline h-3.5 w-3.5" />
+								<Table.Cell class="py-3 font-mono text-sm truncate max-w-[300px]" title={endpoint.endpoint}>
+									{endpoint.endpoint}
+								</Table.Cell>
+								<Table.Cell class="py-3 text-right tabular-nums">
+									{endpoint.count.toLocaleString()}
+								</Table.Cell>
+								<Table.Cell class="py-3 text-right font-mono text-sm tabular-nums">
+									{formatDuration(endpoint.p50Duration)}
+								</Table.Cell>
+								<Table.Cell class="py-3 text-right font-mono text-sm tabular-nums">
+									{formatDuration(endpoint.p95Duration)}
+								</Table.Cell>
+								{@const impact = getImpactIndicator(endpoint.count, endpoint.p50Duration, endpoint.p95Duration)}
+								<Table.Cell class="py-3 text-right font-mono text-sm tabular-nums">
+									<span class={impact.class}>{impact.text}</span>
 								</Table.Cell>
 							</Table.Row>
-						{:else}
-							<Table.Row>
-								<Table.Cell colspan={5} class="h-24 text-center text-muted-foreground">
-									No transaction data received yet
-								</Table.Cell>
-							</Table.Row>
-						{/if}
+						{/each}
+						<Table.Row
+							class="cursor-pointer bg-muted/50 hover:bg-muted"
+							onclick={() => goto('/transactions')}
+						>
+							<Table.Cell colspan={5} class="py-2 text-center text-sm text-muted-foreground">
+								View all transactions <ArrowRight class="inline h-3.5 w-3.5" />
+							</Table.Cell>
+						</Table.Row>
 					</Table.Body>
+					{:else}
+					<Table.Body>
+						<Table.Row>
+							<Table.Cell colspan={5} class="h-24 text-center text-muted-foreground">
+								No transaction data received yet
+							</Table.Cell>
+						</Table.Row>
+					</Table.Body>
+					{/if}
 				</Table.Root>
 			</div>
 		</div>
@@ -294,7 +288,7 @@
 			</div>
 			<div class="rounded-md border overflow-hidden">
 				<Table.Root>
-					{#if loading || (data?.recentIssues && data.recentIssues.length > 0)}
+					{#if data?.recentIssues && data.recentIssues.length > 0}
 					<Table.Header>
 						<Table.Row class="hover:bg-transparent">
 							<Table.Head class="h-10 text-sm">
@@ -338,49 +332,41 @@
 							</Table.Head>
 						</Table.Row>
 					</Table.Header>
-					{/if}
 					<Table.Body>
-						{#if loading}
-							{#each Array(4) as _}
-								<Table.Row>
-									<Table.Cell class="py-3"><Skeleton class="h-4 w-[200px]" /></Table.Cell>
-									<Table.Cell class="py-3 text-right"><Skeleton class="h-4 w-[30px] ml-auto" /></Table.Cell>
-									<Table.Cell class="py-3 text-right"><Skeleton class="h-4 w-[35px] ml-auto" /></Table.Cell>
-								</Table.Row>
-							{/each}
-						{:else if data?.recentIssues && data.recentIssues.length > 0}
-							{#each data.recentIssues as issue}
-								<Table.Row
-									class="cursor-pointer hover:bg-muted/50"
-									onclick={() => goto(`/issues/${issue.exceptionHash}`)}
-								>
-									<Table.Cell class="py-3 font-mono text-sm" title={issue.stackTrace}>
-										{truncateStackTrace(issue.stackTrace)}
-									</Table.Cell>
-									<Table.Cell class="py-3 text-right font-medium tabular-nums">
-										{issue.count}
-									</Table.Cell>
-									<Table.Cell class="py-3 text-right text-muted-foreground text-sm tabular-nums">
-										{formatRelativeTime(issue.lastSeen)}
-									</Table.Cell>
-								</Table.Row>
-							{/each}
+						{#each data.recentIssues as issue}
 							<Table.Row
-								class="cursor-pointer bg-muted/50 hover:bg-muted"
-								onclick={() => goto('/issues')}
+								class="cursor-pointer hover:bg-muted/50"
+								onclick={() => goto(`/issues/${issue.exceptionHash}`)}
 							>
-								<Table.Cell colspan={3} class="py-2 text-center text-sm text-muted-foreground">
-									View all issues <ArrowRight class="inline h-3.5 w-3.5" />
+								<Table.Cell class="py-3 font-mono text-sm" title={issue.stackTrace}>
+									{truncateStackTrace(issue.stackTrace)}
+								</Table.Cell>
+								<Table.Cell class="py-3 text-right font-medium tabular-nums">
+									{issue.count}
+								</Table.Cell>
+								<Table.Cell class="py-3 text-right text-muted-foreground text-sm tabular-nums">
+									{formatRelativeTime(issue.lastSeen)}
 								</Table.Cell>
 							</Table.Row>
-						{:else}
-							<Table.Row>
-								<Table.Cell colspan={3} class="h-24 text-center text-muted-foreground">
-									No issues in the last 24 hours
-								</Table.Cell>
-							</Table.Row>
-						{/if}
+						{/each}
+						<Table.Row
+							class="cursor-pointer bg-muted/50 hover:bg-muted"
+							onclick={() => goto('/issues')}
+						>
+							<Table.Cell colspan={3} class="py-2 text-center text-sm text-muted-foreground">
+								View all issues <ArrowRight class="inline h-3.5 w-3.5" />
+							</Table.Cell>
+						</Table.Row>
 					</Table.Body>
+					{:else}
+					<Table.Body>
+						<Table.Row>
+							<Table.Cell colspan={3} class="h-24 text-center text-muted-foreground">
+								No issues in the last 24 hours
+							</Table.Cell>
+						</Table.Row>
+					</Table.Body>
+					{/if}
 				</Table.Root>
 			</div>
 		</div>

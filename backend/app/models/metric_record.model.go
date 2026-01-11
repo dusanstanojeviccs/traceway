@@ -10,12 +10,12 @@ type MetricRecord struct {
 }
 
 const (
-	MetricNameMemoryUsage     = "mem.used"
-	MetricNameMemoryUsagePcnt = "mem.used_pcnt"
-	MetricNameCpuUsage        = "cpu.used_pcnt"
-	MetricNameGoRoutines      = "go.go_routines"
-	MetricNameHeapObjects     = "go.heap_objects"
-	MetricNameNumGC           = "go.num_gc"
-	MetricNameGCPauseTotal    = "go.gc_pause"
+	MetricNameMemoryUsage  = "mem.used"
+	MetricNameMemoryTotal  = "mem.total"
+	MetricNameCpuUsage     = "cpu.used_pcnt"
+	MetricNameGoRoutines   = "go.go_routines"
+	MetricNameHeapObjects  = "go.heap_objects"
+	MetricNameNumGC        = "go.num_gc"
+	MetricNameGCPauseTotal = "go.gc_pause"
 	// other metric names are custom and added by the clients
 )

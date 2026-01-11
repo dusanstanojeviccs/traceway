@@ -134,14 +134,14 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	memPrev, _ := repositories.MetricRecordRepository.GetAverageBetween(c, projectId, models.MetricNameMemoryUsage, prevStart, prevEnd)
 	metrics = append(metrics, buildMetric("memory_usage", "Memory Usage", memCurrent, "MB", memTrend, memPrev, "memory"))
 
-	// 7. Memory Usage Percentage
-	memPcntTrend, err := repositories.MetricRecordRepository.GetAverageByInterval(c, projectId, models.MetricNameMemoryUsagePcnt, start, end, intervalMinutes)
+	// 7. Total System Memory (MB)
+	memTotalTrend, err := repositories.MetricRecordRepository.GetAverageByInterval(c, projectId, models.MetricNameMemoryTotal, start, end, intervalMinutes)
 	if err != nil {
 		panic(err)
 	}
-	memPcntCurrent := getLastValue(memPcntTrend)
-	memPcntPrev, _ := repositories.MetricRecordRepository.GetAverageBetween(c, projectId, models.MetricNameMemoryUsagePcnt, prevStart, prevEnd)
-	metrics = append(metrics, buildMetric("memory_usage_pcnt", "Memory %", memPcntCurrent, "%", memPcntTrend, memPcntPrev, "memory_pcnt"))
+	memTotalCurrent := getLastValue(memTotalTrend)
+	memTotalPrev, _ := repositories.MetricRecordRepository.GetAverageBetween(c, projectId, models.MetricNameMemoryTotal, prevStart, prevEnd)
+	metrics = append(metrics, buildMetric("memory_total", "Total Memory", memTotalCurrent, "MB", memTotalTrend, memTotalPrev, "memory_total"))
 
 	// 8. Go Routines
 	goRoutinesTrend, err := repositories.MetricRecordRepository.GetAverageByInterval(c, projectId, models.MetricNameGoRoutines, start, end, intervalMinutes)
@@ -270,13 +270,8 @@ func calculateStatus(value float64, metricType string) string {
 			return "warning"
 		}
 		return "healthy"
-	case "memory_pcnt":
-		// Higher is worse for memory percentage
-		if value > 90 {
-			return "critical"
-		} else if value > 70 {
-			return "warning"
-		}
+	case "memory_total":
+		// Total memory is informational - always healthy
 		return "healthy"
 	case "go_routines":
 		// Higher may indicate goroutine leaks

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { Button } from '$lib/components/ui/button';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import { RefreshCw } from 'lucide-svelte';
 	import MetricCard from '$lib/components/dashboard/metric-card.svelte';
 	import type { DashboardData, DashboardMetric } from '$lib/types/dashboard';
@@ -275,19 +275,9 @@
 	{#if !error}
 	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 		{#if loading}
-			{#each Array(11) as _}
-				<Card>
-					<CardContent class="flex gap-3 flex-col">
-						<div class="flex items-center justify-between">
-							<Skeleton class="h-4 w-24" />
-							<Skeleton class="h-2 w-2 rounded-full" />
-						</div>
-						<Skeleton class="h-8 w-32" />
-						<Skeleton class="h-16 w-full" />
-						<Skeleton class="h-3 w-28" />
-					</CardContent>
-				</Card>
-			{/each}
+			<div class="col-span-full flex justify-center items-center py-20">
+				<LoadingCircle size="lg" />
+			</div>
 		{:else if dashboardData}
 			{#each dashboardData.metrics as metric (metric.id)}
 				<MetricCard {metric} timeDomain={sharedTimeDomain} onRangeSelect={handleChartRangeSelect} />

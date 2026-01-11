@@ -6,7 +6,7 @@
     import { Input } from "$lib/components/ui/input";
     import { Button } from "$lib/components/ui/button";
     import * as Select from "$lib/components/ui/select";
-    import { Skeleton } from "$lib/components/ui/skeleton";
+    import { LoadingCircle } from "$lib/components/ui/loading-circle";
     import { Checkbox } from "$lib/components/ui/checkbox";
     import { projectsState } from '$lib/state/projects.svelte';
     import IssueTrendChart from '$lib/components/issue-trend-chart.svelte';
@@ -237,7 +237,33 @@
 
     <div class="rounded-md border overflow-hidden">
         <Table.Root>
-            {#if loading || exceptions.length > 0}
+            {#if loading}
+            <Table.Body>
+                <Table.Row>
+                    <Table.Cell colspan={5} class="h-48">
+                        <div class="flex justify-center items-center h-full">
+                            <LoadingCircle size="lg" />
+                        </div>
+                    </Table.Cell>
+                </Table.Row>
+            </Table.Body>
+            {:else if error}
+            <Table.Body>
+                <Table.Row>
+                    <Table.Cell colspan={5} class="h-24 text-center text-red-500">
+                        {error}
+                    </Table.Cell>
+                </Table.Row>
+            </Table.Body>
+            {:else if exceptions.length === 0}
+            <Table.Body>
+                <Table.Row>
+                    <Table.Cell colspan={5} class="h-24 text-center text-muted-foreground">
+                        No issues found.
+                    </Table.Cell>
+                </Table.Row>
+            </Table.Body>
+            {:else}
             <Table.Header>
                 <Table.Row>
                     <Table.Head class="w-[40px] pl-4">
@@ -253,69 +279,45 @@
                     <Table.Head class="w-[180px]">Last Seen</Table.Head>
                 </Table.Row>
             </Table.Header>
-            {/if}
             <Table.Body>
-                {#if loading}
-                     {#each Array(5) as _}
-                        <Table.Row>
-                            <Table.Cell class="pl-4"><Skeleton class="h-4 w-4" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[250px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-7 w-[176px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[40px] ml-auto" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[120px]" /></Table.Cell>
-                        </Table.Row>
-                     {/each}
-                {:else if error}
-                    <Table.Row>
-                        <Table.Cell colspan={5} class="h-24 text-center text-red-500">
-                            {error}
+                {#each exceptions as exception (exception.exceptionHash)}
+                    <Table.Row
+                        class="cursor-pointer hover:bg-muted/50 group"
+                        data-state={isSelected(exception.exceptionHash) ? "selected" : undefined}
+                    >
+                        <Table.Cell class="pl-4" onclick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                                checked={isSelected(exception.exceptionHash)}
+                                onCheckedChange={() => toggleSelect(exception.exceptionHash)}
+                                aria-label="Select row"
+                            />
                         </Table.Cell>
-                    </Table.Row>
-                {:else if exceptions.length === 0}
-                    <Table.Row>
-                        <Table.Cell colspan={5} class="h-24 text-center text-muted-foreground">
-                            No issues found.
-                        </Table.Cell>
-                    </Table.Row>
-                {:else}
-                    {#each exceptions as exception (exception.exceptionHash)}
-                        <Table.Row
-                            class="cursor-pointer hover:bg-muted/50 group"
-                            data-state={isSelected(exception.exceptionHash) ? "selected" : undefined}
+                        <Table.Cell
+                            class="font-mono text-sm truncate max-w-[400px]"
+                            title={exception.stackTrace}
+                            onclick={() => goto(`/issues/${exception.exceptionHash}`)}
                         >
-                            <Table.Cell class="pl-4" onclick={(e) => e.stopPropagation()}>
-                                <Checkbox
-                                    checked={isSelected(exception.exceptionHash)}
-                                    onCheckedChange={() => toggleSelect(exception.exceptionHash)}
-                                    aria-label="Select row"
-                                />
-                            </Table.Cell>
-                            <Table.Cell
-                                class="font-mono text-sm truncate max-w-[400px]"
-                                title={exception.stackTrace}
-                                onclick={() => goto(`/issues/${exception.exceptionHash}`)}
-                            >
-                                <span class="text-foreground">{exception.stackTrace.split('\n')[0]}</span>
-                            </Table.Cell>
-                            <Table.Cell onclick={() => goto(`/issues/${exception.exceptionHash}`)}>
-                                <IssueTrendChart trend={exception.hourlyTrend || []} />
-                            </Table.Cell>
-                            <Table.Cell
-                                class="text-right tabular-nums font-medium"
-                                onclick={() => goto(`/issues/${exception.exceptionHash}`)}
-                            >
-                                {exception.count.toLocaleString()}
-                            </Table.Cell>
-                            <Table.Cell
-                                class="text-muted-foreground"
-                                onclick={() => goto(`/issues/${exception.exceptionHash}`)}
-                            >
-                                {new Date(exception.lastSeen).toLocaleString()}
-                            </Table.Cell>
-                        </Table.Row>
-                    {/each}
-                {/if}
+                            <span class="text-foreground">{exception.stackTrace.split('\n')[0]}</span>
+                        </Table.Cell>
+                        <Table.Cell onclick={() => goto(`/issues/${exception.exceptionHash}`)}>
+                            <IssueTrendChart trend={exception.hourlyTrend || []} />
+                        </Table.Cell>
+                        <Table.Cell
+                            class="text-right tabular-nums font-medium"
+                            onclick={() => goto(`/issues/${exception.exceptionHash}`)}
+                        >
+                            {exception.count.toLocaleString()}
+                        </Table.Cell>
+                        <Table.Cell
+                            class="text-muted-foreground"
+                            onclick={() => goto(`/issues/${exception.exceptionHash}`)}
+                        >
+                            {new Date(exception.lastSeen).toLocaleString()}
+                        </Table.Cell>
+                    </Table.Row>
+                {/each}
             </Table.Body>
+            {/if}
         </Table.Root>
     </div>
 
