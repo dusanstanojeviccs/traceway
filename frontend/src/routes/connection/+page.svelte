@@ -7,6 +7,11 @@
     import { projectsState, type ProjectWithToken, type Framework } from '$lib/state/projects.svelte';
     import { Skeleton } from '$lib/components/ui/skeleton';
     import FrameworkIcon from '$lib/components/framework-icon.svelte';
+    import Highlight from 'svelte-highlight';
+    import go from 'svelte-highlight/languages/go';
+    import bash from 'svelte-highlight/languages/bash';
+    import { themeState } from '$lib/state/theme.svelte';
+    import 'svelte-highlight/styles/github-dark.css';
 
     let projectWithToken = $state<ProjectWithToken | null>(null);
     let loading = $state(true);
@@ -54,35 +59,11 @@
 
         switch (framework) {
             case 'gin':
-                return `package main
-
-import (
-    "github.com/gin-gonic/gin"
-    "github.com/traceway-io/go-client"
-    "github.com/traceway-io/go-client/traceway_gin"
-)
+                return `import "github.com/traceway-io/go-client/traceway_gin"
 
 func main() {
     r := gin.Default()
-
-    // Add Traceway middleware with optional version and server name
-    r.Use(traceway_gin.New(
-        "${connectionString}",
-        traceway.WithVersion("1.0.0"),        // Optional: your app version
-        traceway.WithServerName("api-server"), // Optional: defaults to hostname
-    ))
-
-    // Your routes
-    r.GET("/", func(c *gin.Context) {
-        c.JSON(200, gin.H{"message": "Hello World"})
-    })
-
-    // Capture custom messages
-    r.GET("/action", func(c *gin.Context) {
-        traceway.CaptureMessage("User performed action")
-        c.JSON(200, gin.H{"status": "ok"})
-    })
-
+    r.Use(traceway_gin.New("${connectionString}"))
     r.Run(":8080")
 }`;
 
@@ -279,7 +260,9 @@ func main() {
                             {/if}
                         </Button>
                     </div>
-                    <pre class="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono leading-relaxed"><code class="language-go">{sdkCode}</code></pre>
+                    <div class="rounded-lg overflow-hidden text-sm {themeState.isDark ? 'dark-code' : 'light-code'}">
+                        <Highlight language={go} code={sdkCode} />
+                    </div>
                 </div>
             </CardContent>
         </Card>
@@ -308,7 +291,9 @@ func main() {
                             {/if}
                         </Button>
                     </div>
-                    <pre class="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">{installCommand}</pre>
+                    <div class="rounded-lg overflow-hidden text-sm {themeState.isDark ? 'dark-code' : 'light-code'}">
+                        <Highlight language={bash} code={installCommand} />
+                    </div>
                 </div>
             </CardContent>
         </Card>
@@ -322,3 +307,53 @@ func main() {
         </Card>
     {/if}
 </div>
+
+<style>
+    /* Light theme - override dark theme defaults */
+    :global(.light-code .hljs) {
+        background: #f6f8fa;
+        color: #24292e;
+    }
+    :global(.light-code .hljs-keyword),
+    :global(.light-code .hljs-selector-tag) {
+        color: #d73a49;
+    }
+    :global(.light-code .hljs-string),
+    :global(.light-code .hljs-attr) {
+        color: #032f62;
+    }
+    :global(.light-code .hljs-function),
+    :global(.light-code .hljs-title) {
+        color: #6f42c1;
+    }
+    :global(.light-code .hljs-comment) {
+        color: #6a737d;
+    }
+    :global(.light-code .hljs-built_in) {
+        color: #005cc5;
+    }
+
+    /* Dark theme - ensure dark styles apply */
+    :global(.dark-code .hljs) {
+        background: #0d1117;
+        color: #c9d1d9;
+    }
+    :global(.dark-code .hljs-keyword),
+    :global(.dark-code .hljs-selector-tag) {
+        color: #ff7b72;
+    }
+    :global(.dark-code .hljs-string),
+    :global(.dark-code .hljs-attr) {
+        color: #a5d6ff;
+    }
+    :global(.dark-code .hljs-function),
+    :global(.dark-code .hljs-title) {
+        color: #d2a8ff;
+    }
+    :global(.dark-code .hljs-comment) {
+        color: #8b949e;
+    }
+    :global(.dark-code .hljs-built_in) {
+        color: #79c0ff;
+    }
+</style>

@@ -283,6 +283,90 @@ func (e *transactionRepository) ErrorRateByHour(ctx context.Context, projectId s
 	return points, nil
 }
 
+// CountByInterval returns transaction counts grouped by configurable interval in minutes
+func (e *transactionRepository) CountByInterval(ctx context.Context, projectId string, start, end time.Time, intervalMinutes int) ([]models.TimeSeriesPoint, error) {
+	query := `SELECT
+		toStartOfInterval(recorded_at, INTERVAL ? MINUTE) as bucket,
+		toFloat64(count()) as count
+	FROM transactions
+	WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?
+	GROUP BY bucket
+	ORDER BY bucket ASC`
+
+	rows, err := (*chdb.Conn).Query(ctx, query, intervalMinutes, projectId, start, end)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var points []models.TimeSeriesPoint
+	for rows.Next() {
+		var p models.TimeSeriesPoint
+		if err := rows.Scan(&p.Timestamp, &p.Value); err != nil {
+			return nil, err
+		}
+		points = append(points, p)
+	}
+
+	return points, nil
+}
+
+// AvgDurationByInterval returns average response time in ms grouped by configurable interval
+func (e *transactionRepository) AvgDurationByInterval(ctx context.Context, projectId string, start, end time.Time, intervalMinutes int) ([]models.TimeSeriesPoint, error) {
+	query := `SELECT
+		toStartOfInterval(recorded_at, INTERVAL ? MINUTE) as bucket,
+		avg(duration) / 1000000 as avg_duration_ms
+	FROM transactions
+	WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?
+	GROUP BY bucket
+	ORDER BY bucket ASC`
+
+	rows, err := (*chdb.Conn).Query(ctx, query, intervalMinutes, projectId, start, end)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var points []models.TimeSeriesPoint
+	for rows.Next() {
+		var p models.TimeSeriesPoint
+		if err := rows.Scan(&p.Timestamp, &p.Value); err != nil {
+			return nil, err
+		}
+		points = append(points, p)
+	}
+
+	return points, nil
+}
+
+// ErrorRateByInterval returns error rate (percentage) grouped by configurable interval
+func (e *transactionRepository) ErrorRateByInterval(ctx context.Context, projectId string, start, end time.Time, intervalMinutes int) ([]models.TimeSeriesPoint, error) {
+	query := `SELECT
+		toStartOfInterval(recorded_at, INTERVAL ? MINUTE) as bucket,
+		countIf(status_code >= 400) * 100.0 / count() as error_rate
+	FROM transactions
+	WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?
+	GROUP BY bucket
+	ORDER BY bucket ASC`
+
+	rows, err := (*chdb.Conn).Query(ctx, query, intervalMinutes, projectId, start, end)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var points []models.TimeSeriesPoint
+	for rows.Next() {
+		var p models.TimeSeriesPoint
+		if err := rows.Scan(&p.Timestamp, &p.Value); err != nil {
+			return nil, err
+		}
+		points = append(points, p)
+	}
+
+	return points, nil
+}
+
 // FindWorstEndpoints returns endpoints ordered by impact score (count * variance)
 // Higher call volume + larger variance = higher impact
 func (e *transactionRepository) FindWorstEndpoints(ctx context.Context, projectId string, start, end time.Time, limit int) ([]models.EndpointStats, error) {

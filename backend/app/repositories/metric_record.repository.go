@@ -56,4 +56,32 @@ func (e *metricRecordRepository) GetAverageByHour(ctx context.Context, projectId
 	return points, nil
 }
 
+// GetAverageByInterval returns metric averages grouped by configurable interval in minutes
+func (e *metricRecordRepository) GetAverageByInterval(ctx context.Context, projectId string, name string, start, end time.Time, intervalMinutes int) ([]models.TimeSeriesPoint, error) {
+	query := `SELECT
+		toStartOfInterval(recorded_at, INTERVAL ? MINUTE) as bucket,
+		avg(value) as avg_value
+	FROM metric_records
+	WHERE project_id = ? AND name = ? AND recorded_at >= ? AND recorded_at <= ?
+	GROUP BY bucket
+	ORDER BY bucket ASC`
+
+	rows, err := (*chdb.Conn).Query(ctx, query, intervalMinutes, projectId, name, start, end)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var points []models.TimeSeriesPoint
+	for rows.Next() {
+		var p models.TimeSeriesPoint
+		if err := rows.Scan(&p.Timestamp, &p.Value); err != nil {
+			return nil, err
+		}
+		points = append(points, p)
+	}
+
+	return points, nil
+}
+
 var MetricRecordRepository = metricRecordRepository{}

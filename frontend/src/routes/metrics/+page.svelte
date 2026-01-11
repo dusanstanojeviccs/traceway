@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { RefreshCw } from 'lucide-svelte';
@@ -10,19 +11,129 @@
 	import { ErrorDisplay } from '$lib/components/ui/error-display';
 	import { projectsState } from '$lib/state/projects.svelte';
 	import { TimeRangePicker } from '$lib/components/ui/time-range-picker';
-	import { CalendarDate, getLocalTimeZone, today } from '@internationalized/date';
+	import { CalendarDate } from '@internationalized/date';
 
 	let dashboardData = $state<DashboardData | null>(null);
 	let loading = $state(true);
 	let error = $state('');
 	let errorStatus = $state<number>(0);
 
-	// Date Range State - default to last 24 hours
-	let fromDate = $state<CalendarDate>(today(getLocalTimeZone()).subtract({ days: 1 }));
-	let toDate = $state<CalendarDate>(today(getLocalTimeZone()));
-	let fromTime = $state('00:00');
-	let toTime = $state('23:59');
+	// Preset definitions (must match TimeRangePicker)
+	const presetMinutes: Record<string, number> = {
+		'30m': 30,
+		'60m': 60,
+		'3h': 180,
+		'6h': 360,
+		'12h': 720,
+		'24h': 1440,
+		'3d': 4320,
+		'7d': 10080,
+		'1M': 43200,
+		'3M': 129600,
+	};
+
+	// Calculate time range from preset
+	function getTimeRangeFromPreset(presetValue: string): { from: Date; to: Date } {
+		const minutes = presetMinutes[presetValue] || 360; // Default to 6h
+		const now = new Date();
+		const from = new Date(now.getTime() - minutes * 60 * 1000);
+		return { from, to: now };
+	}
+
+	// Parse URL params
+	function parseUrlParams(): { preset: string | null; from: Date | null; to: Date | null } {
+		if (!browser) return { preset: '6h', from: null, to: null };
+		const params = new URLSearchParams(window.location.search);
+		const presetParam = params.get('preset');
+		const fromParam = params.get('from');
+		const toParam = params.get('to');
+
+		// If preset is specified, use it
+		if (presetParam && presetMinutes[presetParam]) {
+			return { preset: presetParam, from: null, to: null };
+		}
+
+		// If custom from/to specified
+		if (fromParam && toParam) {
+			const from = new Date(fromParam);
+			const to = new Date(toParam);
+			if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
+				return { preset: null, from, to };
+			}
+		}
+
+		// Default to 6h preset
+		return { preset: '6h', from: null, to: null };
+	}
+
+	function dateToCalendarDate(date: Date): CalendarDate {
+		return new CalendarDate(date.getFullYear(), date.getMonth() + 1, date.getDate());
+	}
+
+	function dateToTimeString(date: Date): string {
+		return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+	}
+
+	// Initialize from URL or defaults
+	const initialUrlParams = parseUrlParams();
+	const initialRange = initialUrlParams.preset
+		? getTimeRangeFromPreset(initialUrlParams.preset)
+		: { from: initialUrlParams.from!, to: initialUrlParams.to! };
+
+	let selectedPreset = $state<string | null>(initialUrlParams.preset);
+	let fromDate = $state<CalendarDate>(dateToCalendarDate(initialRange.from));
+	let toDate = $state<CalendarDate>(dateToCalendarDate(initialRange.to));
+	let fromTime = $state(dateToTimeString(initialRange.from));
+	let toTime = $state(dateToTimeString(initialRange.to));
 	let sharedTimeDomain = $state<[Date, Date] | null>(null);
+
+	// Update URL with current time range
+	function updateUrl(pushState = true) {
+		if (!browser) return;
+
+		const params = new URLSearchParams();
+
+		if (selectedPreset) {
+			// Store preset in URL
+			params.set('preset', selectedPreset);
+		} else {
+			// Store custom from/to in URL
+			const fromDateTime = new Date(getFromDateTime());
+			const toDateTime = new Date(getToDateTime());
+			params.set('from', fromDateTime.toISOString());
+			params.set('to', toDateTime.toISOString());
+		}
+
+		const newUrl = `${window.location.pathname}?${params.toString()}`;
+
+		if (pushState) {
+			window.history.pushState({}, '', newUrl);
+		} else {
+			window.history.replaceState({}, '', newUrl);
+		}
+	}
+
+	// Handle browser back/forward navigation
+	function handlePopState() {
+		const urlParams = parseUrlParams();
+
+		if (urlParams.preset) {
+			selectedPreset = urlParams.preset;
+			const range = getTimeRangeFromPreset(urlParams.preset);
+			fromDate = dateToCalendarDate(range.from);
+			fromTime = dateToTimeString(range.from);
+			toDate = dateToCalendarDate(range.to);
+			toTime = dateToTimeString(range.to);
+		} else if (urlParams.from && urlParams.to) {
+			selectedPreset = null;
+			fromDate = dateToCalendarDate(urlParams.from);
+			fromTime = dateToTimeString(urlParams.from);
+			toDate = dateToCalendarDate(urlParams.to);
+			toTime = dateToTimeString(urlParams.to);
+		}
+
+		loadDashboard(false); // Don't push to history on popstate
+	}
 
 	// Combine date and time into ISO datetime string
 	function getFromDateTime(): string {
@@ -35,18 +146,32 @@
 		return `${dateStr}T${toTime || '23:59'}`;
 	}
 
-	function handleTimeRangeChange(from: { date: CalendarDate; time: string }, to: { date: CalendarDate; time: string }) {
+	function handleTimeRangeChange(from: { date: CalendarDate; time: string }, to: { date: CalendarDate; time: string }, preset: string | null) {
 		fromDate = from.date;
 		fromTime = from.time;
 		toDate = to.date;
 		toTime = to.time;
+		selectedPreset = preset;
 		loadDashboard();
 	}
 
-	async function loadDashboard() {
+	// Handle drag-to-zoom selection from chart overlay
+	function handleChartRangeSelect(from: Date, to: Date) {
+		selectedPreset = null; // Chart selection is always custom
+		fromDate = new CalendarDate(from.getFullYear(), from.getMonth() + 1, from.getDate());
+		fromTime = `${String(from.getHours()).padStart(2, '0')}:${String(from.getMinutes()).padStart(2, '0')}`;
+		toDate = new CalendarDate(to.getFullYear(), to.getMonth() + 1, to.getDate());
+		toTime = `${String(to.getHours()).padStart(2, '0')}:${String(to.getMinutes()).padStart(2, '0')}`;
+		loadDashboard();
+	}
+
+	async function loadDashboard(pushToHistory = true) {
 		loading = true;
 		error = '';
 		errorStatus = 0;
+
+		// Update URL with current time range
+		updateUrl(pushToHistory);
 
 		try {
 			const fromDateTime = new Date(getFromDateTime());
@@ -90,7 +215,15 @@
 	}
 
 	onMount(() => {
-		loadDashboard();
+		// On initial load, use replaceState to set URL without creating history entry
+		loadDashboard(false);
+
+		// Listen for browser back/forward navigation
+		window.addEventListener('popstate', handlePopState);
+
+		return () => {
+			window.removeEventListener('popstate', handlePopState);
+		};
 	});
 
 	const lastUpdatedFormatted = $derived(
@@ -120,9 +253,10 @@
 				bind:toDate
 				bind:fromTime
 				bind:toTime
+				bind:preset={selectedPreset}
 				onApply={handleTimeRangeChange}
 			/>
-			<Button variant="outline" size="sm" onclick={loadDashboard} disabled={loading}>
+			<Button variant="outline" size="sm" onclick={() => loadDashboard()} disabled={loading}>
 				<RefreshCw class="h-4 w-4 {loading ? 'animate-spin' : ''}" />
 			</Button>
 		</div>
@@ -156,7 +290,7 @@
 			{/each}
 		{:else if dashboardData}
 			{#each dashboardData.metrics as metric (metric.id)}
-				<MetricCard {metric} timeDomain={sharedTimeDomain} />
+				<MetricCard {metric} timeDomain={sharedTimeDomain} onRangeSelect={handleChartRangeSelect} />
 			{/each}
 		{/if}
 	</div>

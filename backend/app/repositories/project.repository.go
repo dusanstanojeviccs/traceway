@@ -4,9 +4,8 @@ import (
 	"backend/app/chdb"
 	"backend/app/models"
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -66,9 +65,8 @@ func (p *projectRepository) Create(ctx context.Context, name string, framework s
 }
 
 func generateSecureToken() string {
-	bytes := make([]byte, 32)
-	rand.Read(bytes)
-	return hex.EncodeToString(bytes)
+	id := uuid.New()
+	return strings.ReplaceAll(id.String(), "-", "")
 }
 
 var ProjectRepository = projectRepository{}

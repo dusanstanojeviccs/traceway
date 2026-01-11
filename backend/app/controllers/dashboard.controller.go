@@ -44,52 +44,80 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	projectId := c.Query("projectId")
 
 	now := time.Now()
-	start := now.Add(-24 * time.Hour)
-	prevStart := now.Add(-48 * time.Hour)
+	var start, end time.Time
+
+	// Parse fromDate parameter
+	if fromDateStr := c.Query("fromDate"); fromDateStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, fromDateStr); err == nil {
+			start = parsed
+		} else {
+			start = now.Add(-24 * time.Hour)
+		}
+	} else {
+		start = now.Add(-24 * time.Hour)
+	}
+
+	// Parse toDate parameter
+	if toDateStr := c.Query("toDate"); toDateStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, toDateStr); err == nil {
+			end = parsed
+		} else {
+			end = now
+		}
+	} else {
+		end = now
+	}
+
+	// Calculate previous period for comparison (same duration before start)
+	duration := end.Sub(start)
+	prevStart := start.Add(-duration)
 	prevEnd := start
+
+	// Calculate aggregation interval based on time range
+	intervalMinutes := calculateIntervalMinutes(duration)
 
 	metrics := make([]models.DashboardMetric, 0, 11)
 
 	// 1. Requests count
-	requestsTrend, err := repositories.TransactionRepository.CountByHour(c, projectId, start, now)
+	requestsTrend, err := repositories.TransactionRepository.CountByInterval(c, projectId, start, end, intervalMinutes)
 	if err != nil {
 		panic(err)
 	}
-	requestsCurrent, _ := repositories.TransactionRepository.CountBetween(c, projectId, start, now)
+	requestsCurrent, _ := repositories.TransactionRepository.CountBetween(c, projectId, start, end)
 	requestsPrev, _ := repositories.TransactionRepository.CountBetween(c, projectId, prevStart, prevEnd)
 	metrics = append(metrics, buildMetric("requests", "Requests", float64(requestsCurrent), "count", requestsTrend, float64(requestsPrev), "requests"))
 
 	// 2. Exceptions count
-	exceptionsTrend, err := repositories.ExceptionStackTraceRepository.CountByHour(c, projectId, start, now)
+	exceptionsTrend, err := repositories.ExceptionStackTraceRepository.CountByInterval(c, projectId, start, end, intervalMinutes)
 	if err != nil {
 		panic(err)
 	}
-	exceptionsCurrent, _ := repositories.ExceptionStackTraceRepository.CountBetween(c, projectId, start, now)
+	exceptionsCurrent, _ := repositories.ExceptionStackTraceRepository.CountBetween(c, projectId, start, end)
 	exceptionsPrev, _ := repositories.ExceptionStackTraceRepository.CountBetween(c, projectId, prevStart, prevEnd)
 	metrics = append(metrics, buildMetric("exceptions", "Exceptions", float64(exceptionsCurrent), "count", exceptionsTrend, float64(exceptionsPrev), "exceptions"))
 
 	// 3. Average Response Time
-	avgDurationTrend, err := repositories.TransactionRepository.AvgDurationByHour(c, projectId, start, now)
+	avgDurationTrend, err := repositories.TransactionRepository.AvgDurationByInterval(c, projectId, start, end, intervalMinutes)
 	if err != nil {
 		panic(err)
 	}
 	avgDurationCurrent := getLastValue(avgDurationTrend)
-	avgDurationPrevTrend, _ := repositories.TransactionRepository.AvgDurationByHour(c, projectId, prevStart, prevEnd)
+	avgDurationPrevTrend, _ := repositories.TransactionRepository.AvgDurationByInterval(c, projectId, prevStart, prevEnd, intervalMinutes)
 	avgDurationPrev := getAverageValue(avgDurationPrevTrend)
 	metrics = append(metrics, buildMetric("avg_response_time", "Avg Response Time", avgDurationCurrent, "ms", avgDurationTrend, avgDurationPrev, "response_time"))
 
 	// 4. Error Rate
-	errorRateTrend, err := repositories.TransactionRepository.ErrorRateByHour(c, projectId, start, now)
+	errorRateTrend, err := repositories.TransactionRepository.ErrorRateByInterval(c, projectId, start, end, intervalMinutes)
 	if err != nil {
 		panic(err)
 	}
 	errorRateCurrent := getLastValue(errorRateTrend)
-	errorRatePrevTrend, _ := repositories.TransactionRepository.ErrorRateByHour(c, projectId, prevStart, prevEnd)
+	errorRatePrevTrend, _ := repositories.TransactionRepository.ErrorRateByInterval(c, projectId, prevStart, prevEnd, intervalMinutes)
 	errorRatePrev := getAverageValue(errorRatePrevTrend)
 	metrics = append(metrics, buildMetric("error_rate", "Error Rate", errorRateCurrent, "%", errorRateTrend, errorRatePrev, "error_rate"))
 
 	// 5. CPU Usage
-	cpuTrend, err := repositories.MetricRecordRepository.GetAverageByHour(c, projectId, models.MetricNameCpuUsage, start, now)
+	cpuTrend, err := repositories.MetricRecordRepository.GetAverageByInterval(c, projectId, models.MetricNameCpuUsage, start, end, intervalMinutes)
 	if err != nil {
 		panic(err)
 	}
@@ -98,7 +126,7 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	metrics = append(metrics, buildMetric("cpu_usage", "CPU Usage", cpuCurrent, "%", cpuTrend, cpuPrev, "cpu"))
 
 	// 6. Memory Usage (MB)
-	memTrend, err := repositories.MetricRecordRepository.GetAverageByHour(c, projectId, models.MetricNameMemoryUsage, start, now)
+	memTrend, err := repositories.MetricRecordRepository.GetAverageByInterval(c, projectId, models.MetricNameMemoryUsage, start, end, intervalMinutes)
 	if err != nil {
 		panic(err)
 	}
@@ -107,7 +135,7 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	metrics = append(metrics, buildMetric("memory_usage", "Memory Usage", memCurrent, "MB", memTrend, memPrev, "memory"))
 
 	// 7. Memory Usage Percentage
-	memPcntTrend, err := repositories.MetricRecordRepository.GetAverageByHour(c, projectId, models.MetricNameMemoryUsagePcnt, start, now)
+	memPcntTrend, err := repositories.MetricRecordRepository.GetAverageByInterval(c, projectId, models.MetricNameMemoryUsagePcnt, start, end, intervalMinutes)
 	if err != nil {
 		panic(err)
 	}
@@ -116,7 +144,7 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	metrics = append(metrics, buildMetric("memory_usage_pcnt", "Memory %", memPcntCurrent, "%", memPcntTrend, memPcntPrev, "memory_pcnt"))
 
 	// 8. Go Routines
-	goRoutinesTrend, err := repositories.MetricRecordRepository.GetAverageByHour(c, projectId, models.MetricNameGoRoutines, start, now)
+	goRoutinesTrend, err := repositories.MetricRecordRepository.GetAverageByInterval(c, projectId, models.MetricNameGoRoutines, start, end, intervalMinutes)
 	if err != nil {
 		panic(err)
 	}
@@ -125,7 +153,7 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	metrics = append(metrics, buildMetric("go_routines", "Go Routines", goRoutinesCurrent, "", goRoutinesTrend, goRoutinesPrev, "go_routines"))
 
 	// 9. Heap Objects
-	heapObjectsTrend, err := repositories.MetricRecordRepository.GetAverageByHour(c, projectId, models.MetricNameHeapObjects, start, now)
+	heapObjectsTrend, err := repositories.MetricRecordRepository.GetAverageByInterval(c, projectId, models.MetricNameHeapObjects, start, end, intervalMinutes)
 	if err != nil {
 		panic(err)
 	}
@@ -134,7 +162,7 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	metrics = append(metrics, buildMetric("heap_objects", "Heap Objects", heapObjectsCurrent, "", heapObjectsTrend, heapObjectsPrev, "heap_objects"))
 
 	// 10. Num GC
-	numGCTrend, err := repositories.MetricRecordRepository.GetAverageByHour(c, projectId, models.MetricNameNumGC, start, now)
+	numGCTrend, err := repositories.MetricRecordRepository.GetAverageByInterval(c, projectId, models.MetricNameNumGC, start, end, intervalMinutes)
 	if err != nil {
 		panic(err)
 	}
@@ -143,7 +171,7 @@ func (d dashboardController) GetDashboard(c *gin.Context) {
 	metrics = append(metrics, buildMetric("num_gc", "GC Cycles", numGCCurrent, "", numGCTrend, numGCPrev, "num_gc"))
 
 	// 11. GC Pause Total (convert from nanoseconds to milliseconds)
-	gcPauseTrend, err := repositories.MetricRecordRepository.GetAverageByHour(c, projectId, models.MetricNameGCPauseTotal, start, now)
+	gcPauseTrend, err := repositories.MetricRecordRepository.GetAverageByInterval(c, projectId, models.MetricNameGCPauseTotal, start, end, intervalMinutes)
 	if err != nil {
 		panic(err)
 	}
@@ -289,6 +317,23 @@ func getAverageValue(points []models.TimeSeriesPoint) float64 {
 		sum += p.Value
 	}
 	return sum / float64(len(points))
+}
+
+// calculateIntervalMinutes determines the aggregation bucket size based on the time range duration
+func calculateIntervalMinutes(duration time.Duration) int {
+	hours := duration.Hours()
+	switch {
+	case hours < 2:
+		return 1 // 1-minute buckets
+	case hours < 12:
+		return 5 // 5-minute buckets
+	case hours < 48:
+		return 15 // 15-minute buckets
+	case hours < 168: // 7 days
+		return 60 // 1-hour buckets
+	default:
+		return 240 // 4-hour buckets
+	}
 }
 
 var DashboardController = dashboardController{}

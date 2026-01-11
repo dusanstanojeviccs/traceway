@@ -20,7 +20,8 @@
         toDate?: CalendarDate;
         fromTime?: string;
         toTime?: string;
-        onApply?: (from: { date: CalendarDate; time: string }, to: { date: CalendarDate; time: string }) => void;
+        preset?: string | null;
+        onApply?: (from: { date: CalendarDate; time: string }, to: { date: CalendarDate; time: string }, preset: string | null) => void;
     }
 
     let {
@@ -28,6 +29,7 @@
         toDate = $bindable(today(getLocalTimeZone())),
         fromTime = $bindable('00:00'),
         toTime = $bindable('23:59'),
+        preset = $bindable<string | null>('6h'),
         onApply
     }: Props = $props();
 
@@ -62,8 +64,89 @@
     ];
 
     let isOpen = $state(false);
-    let showCustom = $state(false);
-    let selectedPreset = $state<string | null>('7d');
+    let showCustom = $state(preset === null);
+    let selectedPreset = $state<string | null>(preset);
+
+    // Flag to ignore external change detection when we're applying our own changes
+    let isApplyingInternally = $state(false);
+
+    // Sync internal selectedPreset with external preset prop
+    $effect(() => {
+        if (preset !== selectedPreset) {
+            selectedPreset = preset;
+            showCustom = preset === null;
+
+            // If preset is set, calculate the time range
+            if (preset) {
+                const presetDef = presetGroups.flatMap(g => g.presets).find(p => p.value === preset);
+                if (presetDef) {
+                    const now = new Date();
+                    const fromDateTime = new Date(now.getTime() - presetDef.minutes * 60 * 1000);
+
+                    tempFromDateTime = new CalendarDateTime(
+                        fromDateTime.getFullYear(),
+                        fromDateTime.getMonth() + 1,
+                        fromDateTime.getDate(),
+                        fromDateTime.getHours(),
+                        fromDateTime.getMinutes(),
+                        fromDateTime.getSeconds()
+                    );
+                    tempToDateTime = new CalendarDateTime(
+                        now.getFullYear(),
+                        now.getMonth() + 1,
+                        now.getDate(),
+                        now.getHours(),
+                        now.getMinutes(),
+                        now.getSeconds()
+                    );
+                }
+            }
+        }
+    });
+
+    // Track last known bound values to detect external changes
+    let lastFromDate = $state(fromDate);
+    let lastToDate = $state(toDate);
+    let lastFromTime = $state(fromTime);
+    let lastToTime = $state(toTime);
+
+    // Detect external value changes and switch to custom mode
+    $effect(() => {
+        const fromDateChanged = fromDate.year !== lastFromDate.year ||
+            fromDate.month !== lastFromDate.month ||
+            fromDate.day !== lastFromDate.day;
+        const toDateChanged = toDate.year !== lastToDate.year ||
+            toDate.month !== lastToDate.month ||
+            toDate.day !== lastToDate.day;
+        const fromTimeChanged = fromTime !== lastFromTime;
+        const toTimeChanged = toTime !== lastToTime;
+
+        if (fromDateChanged || toDateChanged || fromTimeChanged || toTimeChanged) {
+            // Update last known values
+            lastFromDate = fromDate;
+            lastToDate = toDate;
+            lastFromTime = fromTime;
+            lastToTime = toTime;
+
+            // If picker is not open AND we're not applying internally, this was an external change
+            if (!isOpen && !isApplyingInternally) {
+                showCustom = true;
+                selectedPreset = null;
+
+                // Sync temp values with the new bound values
+                const [fromHour, fromMinute] = fromTime.split(':').map(Number);
+                const [toHour, toMinute] = toTime.split(':').map(Number);
+                tempFromDateTime = new CalendarDateTime(
+                    fromDate.year, fromDate.month, fromDate.day,
+                    fromHour || 0, fromMinute || 0, 0
+                );
+                tempToDateTime = new CalendarDateTime(
+                    toDate.year, toDate.month, toDate.day,
+                    toHour || 23, toMinute || 59, 0
+                );
+            }
+        }
+    });
 
     // DateTime picker popover states
     let fromPickerOpen = $state(false);
@@ -130,13 +213,14 @@
         return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
     }
 
-    function selectPreset(preset: TimeRangePreset) {
-        selectedPreset = preset.value;
+    function selectPreset(presetDef: TimeRangePreset) {
+        selectedPreset = presetDef.value;
+        preset = presetDef.value; // Sync with external prop
         showCustom = false;
 
         // Calculate the date range for this preset
         const now = new Date();
-        const fromDateTime = new Date(now.getTime() - preset.minutes * 60 * 1000);
+        const fromDateTime = new Date(now.getTime() - presetDef.minutes * 60 * 1000);
 
         // Update temp values only - don't close or apply yet
         tempFromDateTime = new CalendarDateTime(
@@ -161,6 +245,7 @@
         showCustom = !showCustom;
         if (showCustom) {
             selectedPreset = null;
+            preset = null; // Sync with external prop
         }
     }
 
@@ -190,11 +275,21 @@
                 !dateTimesEqual(tempToDateTime, initialToDateTime);
 
             if (hasChanged) {
+                // Set flag to prevent external change detection from triggering
+                isApplyingInternally = true;
+
                 fromDate = new CalendarDate(tempFromDateTime.year, tempFromDateTime.month, tempFromDateTime.day);
                 toDate = new CalendarDate(tempToDateTime.year, tempToDateTime.month, tempToDateTime.day);
                 fromTime = `${String(tempFromDateTime.hour).padStart(2, '0')}:${String(tempFromDateTime.minute).padStart(2, '0')}`;
                 toTime = `${String(tempToDateTime.hour).padStart(2, '0')}:${String(tempToDateTime.minute).padStart(2, '0')}`;
-                onApply?.({ date: fromDate, time: fromTime }, { date: toDate, time: toTime });
+
+                // Pass current preset (null if custom mode)
+                const currentPreset = showCustom ? null : selectedPreset;
+                preset = currentPreset; // Sync external prop
+                onApply?.({ date: fromDate, time: fromTime }, { date: toDate, time: toTime }, currentPreset);
+
+                // Reset flag after a tick to allow effects to settle
+                setTimeout(() => { isApplyingInternally = false; }, 0);
             }
 
             // Keep showCustom state (don't reset it) so it remembers custom mode

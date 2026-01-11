@@ -194,6 +194,34 @@ func (e *exceptionStackTraceRepository) CountByHour(ctx context.Context, project
 	return points, nil
 }
 
+// CountByInterval returns exception counts grouped by configurable interval in minutes
+func (e *exceptionStackTraceRepository) CountByInterval(ctx context.Context, projectId string, start, end time.Time, intervalMinutes int) ([]models.TimeSeriesPoint, error) {
+	query := `SELECT
+		toStartOfInterval(recorded_at, INTERVAL ? MINUTE) as bucket,
+		toFloat64(count()) as count
+	FROM exception_stack_traces
+	WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?
+	GROUP BY bucket
+	ORDER BY bucket ASC`
+
+	rows, err := (*chdb.Conn).Query(ctx, query, intervalMinutes, projectId, start, end)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var points []models.TimeSeriesPoint
+	for rows.Next() {
+		var p models.TimeSeriesPoint
+		if err := rows.Scan(&p.Timestamp, &p.Value); err != nil {
+			return nil, err
+		}
+		points = append(points, p)
+	}
+
+	return points, nil
+}
+
 // GetHourlyTrendForHashes returns hourly counts for specific exception hashes
 func (e *exceptionStackTraceRepository) GetHourlyTrendForHashes(ctx context.Context, projectId string, hashes []string, start, end time.Time) (map[string][]models.ExceptionTrendPoint, error) {
 	if len(hashes) == 0 {
