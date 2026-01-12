@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api';
+	import { formatDuration, getStatusColor } from '$lib/utils/formatters';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import { LoadingCircle } from '$lib/components/ui/loading-circle';
@@ -9,6 +10,7 @@
 	import { projectsState } from '$lib/state/projects.svelte';
 	import { ArrowLeft, ArrowRight, TriangleAlert } from 'lucide-svelte';
 	import { LabelValue } from '$lib/components/ui/label-value';
+	import { ContextGrid } from '$lib/components/ui/context-grid';
 	import SegmentWaterfall from '$lib/components/segments/segment-waterfall.svelte';
 	import SegmentEmptyState from '$lib/components/segments/segment-empty-state.svelte';
 	import type { TransactionDetailResponse } from '$lib/types/segments';
@@ -45,17 +47,6 @@
 		}
 	}
 
-	function formatDuration(nanoseconds: number): string {
-		const ms = nanoseconds / 1_000_000;
-		if (ms < 1) {
-			return `${(nanoseconds / 1000).toFixed(2)}us`;
-		} else if (ms < 1000) {
-			return `${ms.toFixed(2)}ms`;
-		} else {
-			return `${(ms / 1000).toFixed(2)}s`;
-		}
-	}
-
 	function formatBytes(bytes: number): string {
 		if (bytes < 1024) {
 			return `${bytes} B`;
@@ -64,13 +55,6 @@
 		} else {
 			return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 		}
-	}
-
-	function getStatusColor(statusCode: number): string {
-		if (statusCode >= 200 && statusCode < 300) return 'text-green-500';
-		if (statusCode >= 300 && statusCode < 400) return 'text-blue-500';
-		if (statusCode >= 400 && statusCode < 500) return 'text-yellow-500';
-		return 'text-red-500';
 	}
 
 	function getBackUrl(): string {
@@ -192,14 +176,7 @@
 					<hr class="border-border" />
 					<div>
 						<p class="mb-3 text-sm font-medium">Context</p>
-						<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-							{#each Object.entries(response.transaction.scope).sort( (a, b) => a[0].localeCompare(b[0]) ) as [key, value]}
-								<div class="flex flex-col gap-1 rounded-md bg-muted p-3">
-									<span class="text-xs font-medium text-muted-foreground">{key}</span>
-									<span class="font-mono text-sm break-all">{value}</span>
-								</div>
-							{/each}
-						</div>
+						<ContextGrid scope={response.transaction.scope} />
 					</div>
 				{/if}
 			</Card.Content>

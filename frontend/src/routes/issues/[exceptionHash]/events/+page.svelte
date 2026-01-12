@@ -3,6 +3,7 @@
     import { page } from '$app/state';
     import { goto } from '$app/navigation';
     import { createRowClickHandler } from '$lib/utils/navigation';
+    import { truncateStackTrace } from '$lib/utils/formatters';
     import { api } from '$lib/api';
     import { Button } from "$lib/components/ui/button";
     import * as Card from "$lib/components/ui/card";
@@ -13,6 +14,7 @@
     import { projectsState } from '$lib/state/projects.svelte';
     import { TracewayTableHeader } from "$lib/components/ui/traceway-table-header";
     import { TableEmptyState } from "$lib/components/ui/table-empty-state";
+    import { PaginationFooter } from "$lib/components/ui/pagination-footer";
 
     type ExceptionGroup = {
         exceptionHash: string;
@@ -91,18 +93,10 @@
         }
     }
 
-    function handlePageSizeChange(newPageSize: string) {
-        pageSize = parseInt(newPageSize);
+    function handlePageSizeChange(newPageSize: number) {
+        pageSize = newPageSize;
         currentPage = 1;
         loadData();
-    }
-
-    function truncateStackTrace(stackTrace: string): string {
-        const firstLine = stackTrace.split('\n')[0];
-        if (firstLine.length > 80) {
-            return firstLine.slice(0, 80) + '...';
-        }
-        return firstLine;
     }
 
     onMount(() => {
@@ -150,7 +144,7 @@
             <Card.Header class="pb-3">
                 <Card.Title class="text-lg">All Events</Card.Title>
                 <Card.Description class="font-mono text-sm">
-                    {truncateStackTrace(group.stackTrace)}
+                    {truncateStackTrace(group.stackTrace, 80)}
                 </Card.Description>
             </Card.Header>
         </Card.Root>
@@ -208,62 +202,16 @@
         </div>
 
         <!-- Pagination Footer -->
-        <div class="flex items-center justify-between px-2">
-            <div class="flex-1 text-sm text-muted-foreground">
-                Showing {occurrences.length} of {total} events
-            </div>
-            <div class="flex items-center space-x-6 lg:space-x-8">
-                <div class="flex items-center space-x-2">
-                    <p class="text-sm font-medium">Rows per page</p>
-                    <Select.Root
-                        type="single"
-                        value={pageSize.toString()}
-                        onValueChange={(v) => {
-                            if (v) {
-                                handlePageSizeChange(v);
-                            }
-                        }}
-                    >
-                        <Select.Trigger class="h-8 w-[70px]">
-                            {pageSizeLabel}
-                        </Select.Trigger>
-                        <Select.Content side="top">
-                            {#each pageSizeOptions as option}
-                                <Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
-                            {/each}
-                        </Select.Content>
-                    </Select.Root>
-                </div>
-                <div class="flex w-[100px] items-center justify-center text-sm font-medium">
-                    Page {currentPage} of {totalPages || 1}
-                </div>
-                <div class="flex items-center space-x-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        class="h-8 w-8 p-0"
-                        onclick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage <= 1 || loading}
-                    >
-                        <span class="sr-only">Go to previous page</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 15 15" fill="none" class="lucide lucide-chevron-left h-4 w-4">
-                            <path d="M8.84182 3.13514C9.04327 3.32401 9.05348 3.64042 8.86462 3.84188L5.43521 7.49991L8.86462 11.1579C9.05348 11.3594 9.04327 11.6758 8.84182 11.8647C8.64036 12.0535 8.32394 12.0433 8.13508 11.8419L4.38508 7.84188C4.20477 7.64955 4.20477 7.35027 4.38508 7.15794L8.13508 3.15794C8.32394 2.95648 8.64036 2.94628 8.84182 3.13514Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path>
-                        </svg>
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        class="h-8 w-8 p-0"
-                        onclick={() => handlePageChange(currentPage + 1)}
-                        disabled={currentPage >= totalPages || loading}
-                    >
-                        <span class="sr-only">Go to next page</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 15 15" fill="none" class="lucide lucide-chevron-right h-4 w-4">
-                            <path d="M6.1584 3.13508C6.35985 2.94621 6.67627 2.95642 6.86514 3.15788L10.6151 7.15788C10.7954 7.3502 10.7954 7.64949 10.6151 7.84182L6.86514 11.8418C6.67627 12.0433 6.35985 12.0535 6.1584 11.8646C5.95694 11.6757 5.94673 11.3593 6.1356 11.1579L9.565 7.49985L6.1356 3.84182C5.94673 3.64036 5.95694 3.32394 6.1584 3.13508Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path>
-                        </svg>
-                    </Button>
-                </div>
-            </div>
-        </div>
+        <PaginationFooter
+            {currentPage}
+            {totalPages}
+            {pageSize}
+            totalItems={total}
+            itemsShown={occurrences.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            {loading}
+            itemLabel="event"
+        />
     {/if}
 </div>

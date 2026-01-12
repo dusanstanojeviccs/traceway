@@ -4,6 +4,8 @@
     import * as Card from "$lib/components/ui/card";
     import { ArrowRight } from "lucide-svelte";
     import type { ExceptionOccurrence, LinkedTransaction } from '$lib/types/exceptions';
+    import { formatDuration, getStatusColor } from '$lib/utils/formatters';
+    import { ContextGrid } from '$lib/components/ui/context-grid';
 
     interface Props {
         occurrence: ExceptionOccurrence;
@@ -19,23 +21,6 @@
         description = "Details for this specific occurrence"
     }: Props = $props();
 
-    function formatDuration(nanoseconds: number): string {
-        const ms = nanoseconds / 1_000_000;
-        if (ms < 1) {
-            return `${(nanoseconds / 1000).toFixed(0)}us`;
-        } else if (ms < 1000) {
-            return `${ms.toFixed(0)}ms`;
-        } else {
-            return `${(ms / 1000).toFixed(1)}s`;
-        }
-    }
-
-    function getStatusColor(statusCode: number): string {
-        if (statusCode >= 200 && statusCode < 300) return 'text-green-500';
-        if (statusCode >= 300 && statusCode < 400) return 'text-blue-500';
-        if (statusCode >= 400 && statusCode < 500) return 'text-yellow-500';
-        return 'text-red-500';
-    }
 </script>
 
 <Card.Root>
@@ -69,14 +54,7 @@
         <hr class="border-border" />
         <div>
             <p class="text-sm font-medium mb-3">Context</p>
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {#each Object.entries(occurrence.scope).sort((a, b) => a[0].localeCompare(b[0])) as [key, value]}
-                    <div class="flex flex-col gap-1 p-3 rounded-md bg-muted">
-                        <span class="text-xs font-medium text-muted-foreground">{key}</span>
-                        <span class="text-sm font-mono break-all">{value}</span>
-                    </div>
-                {/each}
-            </div>
+            <ContextGrid scope={occurrence.scope} />
         </div>
         {/if}
 

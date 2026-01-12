@@ -1,12 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { createRowClickHandler } from '$lib/utils/navigation';
+	import { formatDuration, formatRelativeTime, truncateStackTrace } from '$lib/utils/formatters';
 	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import * as Table from '$lib/components/ui/table';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { ArrowRight, Info, Gauge, Bug, CircleHelp as CircleQuestionMark, TriangleAlert } from 'lucide-svelte';
+	import { ArrowRight, Info, Gauge, Bug, CircleHelp as CircleQuestionMark } from 'lucide-svelte';
 	import { TracewayTableHeader } from '$lib/components/ui/traceway-table-header';
+	import { ImpactBadge } from '$lib/components/ui/impact-badge';
 	import { TableEmptyState } from '$lib/components/ui/table-empty-state';
+	import { ViewAllTableRow } from '$lib/components/ui/view-all-table-row';
 	import { api } from '$lib/api';
 	import { ErrorDisplay } from '$lib/components/ui/error-display';
 	import { projectsState } from '$lib/state/projects.svelte';
@@ -61,31 +64,6 @@
 		loadDashboard();
 	});
 
-	function formatRelativeTime(dateStr: string): string {
-		const date = new Date(dateStr);
-		const now = new Date();
-		const diffMs = now.getTime() - date.getTime();
-		const diffMins = Math.floor(diffMs / 60000);
-		const diffHours = Math.floor(diffMs / 3600000);
-		const diffDays = Math.floor(diffMs / 86400000);
-
-		if (diffMins < 1) return 'just now';
-		if (diffMins < 60) return `${diffMins}m`;
-		if (diffHours < 24) return `${diffHours}h`;
-		return `${diffDays}d`;
-	}
-
-	function formatDuration(nanoseconds: number): string {
-		const ms = nanoseconds / 1_000_000;
-		if (ms < 1) {
-			return `${(nanoseconds / 1000).toFixed(0)}µs`;
-		} else if (ms < 1000) {
-			return `${ms.toFixed(0)}ms`;
-		} else {
-			return `${(ms / 1000).toFixed(1)}s`;
-		}
-	}
-
 	// Calculate impact level based on call volume and response time variance
 	// Returns: 'critical' | 'high' | 'medium' | null (null = not significant)
 	function getImpactLevel(
@@ -101,13 +79,6 @@
 		return null;
 	}
 
-	function truncateStackTrace(stackTrace: string): string {
-		const firstLine = stackTrace.split('\n')[0];
-		if (firstLine.length > 70) {
-			return firstLine.slice(0, 70) + '...';
-		}
-		return firstLine;
-	}
 </script>
 
 <div class="space-y-4">
@@ -214,38 +185,11 @@
 											{formatDuration(endpoint.p95Duration)}
 										</Table.Cell>
 										<Table.Cell class="py-3 text-right">
-											{#if impactLevel === 'critical'}
-												<span
-													class="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400"
-												>
-													<TriangleAlert class="h-3 w-3" />
-													Critical
-												</span>
-											{:else if impactLevel === 'high'}
-												<span
-													class="inline-flex items-center gap-1 rounded-full bg-orange-500/15 px-2 py-0.5 text-xs font-medium text-orange-600 dark:text-orange-400"
-												>
-													<TriangleAlert class="h-3 w-3" />
-													High
-												</span>
-											{:else if impactLevel === 'medium'}
-												<span
-													class="inline-flex items-center gap-1 rounded-full bg-yellow-500/15 px-2 py-0.5 text-xs font-medium text-yellow-600 dark:text-yellow-500"
-												>
-													Medium
-												</span>
-											{/if}
+											<ImpactBadge level={impactLevel} />
 										</Table.Cell>
 									</Table.Row>
 								{/each}
-								<Table.Row
-									class="cursor-pointer bg-muted/50 hover:bg-muted"
-									onclick={createRowClickHandler('/transactions')}
-								>
-									<Table.Cell colspan={5} class="py-2 text-center text-sm text-muted-foreground">
-										View all transactions <ArrowRight class="inline h-3.5 w-3.5" />
-									</Table.Cell>
-								</Table.Row>
+								<ViewAllTableRow colspan={5} href="/transactions" label="View all transactions" />
 							</Table.Body>
 						{:else}
 							<Table.Body>
@@ -312,14 +256,7 @@
 										</Table.Cell>
 									</Table.Row>
 								{/each}
-								<Table.Row
-									class="cursor-pointer bg-muted/50 hover:bg-muted"
-									onclick={createRowClickHandler('/issues')}
-								>
-									<Table.Cell colspan={3} class="py-2 text-center text-sm text-muted-foreground">
-										View all issues <ArrowRight class="inline h-3.5 w-3.5" />
-									</Table.Cell>
-								</Table.Row>
+								<ViewAllTableRow colspan={3} href="/issues" label="View all issues" />
 							</Table.Body>
 						{:else}
 							<Table.Body>

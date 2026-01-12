@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { api } from '$lib/api';
+    import { formatDuration, formatDurationMs, getStatusColor } from '$lib/utils/formatters';
     import * as Table from "$lib/components/ui/table";
     import { Button } from "$lib/components/ui/button";
     import { LoadingCircle } from "$lib/components/ui/loading-circle";
@@ -143,27 +144,6 @@
         loadData();
     }
 
-    function formatDuration(nanoseconds: number): string {
-        const ms = nanoseconds / 1_000_000;
-        if (ms < 1) {
-            return `${(nanoseconds / 1000).toFixed(2)}µs`;
-        } else if (ms < 1000) {
-            return `${ms.toFixed(2)}ms`;
-        } else {
-            return `${(ms / 1000).toFixed(2)}s`;
-        }
-    }
-
-    function formatDurationMs(ms: number): string {
-        if (ms < 1) {
-            return `${(ms * 1000).toFixed(0)} µs`;
-        } else if (ms < 1000) {
-            return `${ms.toFixed(0)} ms`;
-        } else {
-            return `${(ms / 1000).toFixed(2)} s`;
-        }
-    }
-
     function formatBytes(bytes: number): string {
         if (bytes < 1024) {
             return `${bytes} B`;
@@ -171,18 +151,6 @@
             return `${(bytes / 1024).toFixed(1)} KB`;
         } else {
             return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-        }
-    }
-
-    function getStatusColor(statusCode: number): string {
-        if (statusCode >= 200 && statusCode < 300) {
-            return 'text-green-500';
-        } else if (statusCode >= 300 && statusCode < 400) {
-            return 'text-blue-500';
-        } else if (statusCode >= 400 && statusCode < 500) {
-            return 'text-yellow-500';
-        } else {
-            return 'text-red-500';
         }
     }
 

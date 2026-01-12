@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Segment } from '$lib/types/segments';
 	import { cn } from '$lib/utils';
+	import { formatDuration } from '$lib/utils/formatters';
 
 	type Props = {
 		segment: Segment;
@@ -40,13 +41,6 @@
 	}
 
 	const segmentColor = $derived(getSegmentColor(segment.name));
-
-	function formatDuration(nanoseconds: number): string {
-		const ms = nanoseconds / 1_000_000;
-		if (ms < 1) return `${(nanoseconds / 1000).toFixed(0)}µs`;
-		if (ms < 1000) return `${ms.toFixed(1)}ms`;
-		return `${(ms / 1000).toFixed(2)}s`;
-	}
 
 	// Tooltip state
 	let isHovered = $state(false);

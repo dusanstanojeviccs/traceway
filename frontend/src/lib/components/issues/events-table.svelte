@@ -2,9 +2,9 @@
     import { createRowClickHandler } from '$lib/utils/navigation';
     import * as Card from "$lib/components/ui/card";
     import * as Table from "$lib/components/ui/table";
-    import { ArrowRight } from "lucide-svelte";
     import { TracewayTableHeader } from "$lib/components/ui/traceway-table-header";
     import { TableEmptyState } from "$lib/components/ui/table-empty-state";
+    import { ViewAllTableRow } from "$lib/components/ui/view-all-table-row";
     import type { ExceptionOccurrence } from '$lib/types/exceptions';
 
     interface Props {
@@ -84,14 +84,7 @@
                             </Table.Row>
                         {/each}
                         {#if hasMore && showViewAll}
-                            <Table.Row
-                                class="cursor-pointer bg-muted/50 hover:bg-muted"
-                                onclick={createRowClickHandler(`/issues/${exceptionHash}/events`)}
-                            >
-                                <Table.Cell colspan={3} class="py-2 text-center text-sm text-muted-foreground">
-                                    View all {total} events <ArrowRight class="inline h-3.5 w-3.5" />
-                                </Table.Cell>
-                            </Table.Row>
+                            <ViewAllTableRow colspan={3} href={`/issues/${exceptionHash}/events`} label={`View all ${total} events`} />
                         {/if}
                     {/if}
                 </Table.Body>
