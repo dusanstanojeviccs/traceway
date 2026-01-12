@@ -433,4 +433,53 @@ func (e *transactionRepository) FindWorstEndpoints(ctx context.Context, projectI
 	return stats, nil
 }
 
+// GetEndpointStats returns aggregate statistics for a specific endpoint
+func (e *transactionRepository) GetEndpointStats(ctx context.Context, projectId, endpoint string, start, end time.Time) (*models.EndpointDetailStats, error) {
+	// Calculate time range duration for throughput calculation
+	durationMinutes := end.Sub(start).Minutes()
+	if durationMinutes < 1 {
+		durationMinutes = 1
+	}
+
+	query := `SELECT
+		count() as count,
+		avg(duration) / 1000000 as avg_duration_ms,
+		quantile(0.5)(duration) / 1000000 as p50_duration_ms,
+		quantile(0.95)(duration) / 1000000 as p95_duration_ms,
+		quantile(0.99)(duration) / 1000000 as p99_duration_ms,
+		countIf(status_code >= 400) * 100.0 / count() as error_rate,
+		countIf(duration <= 500000000 AND status_code < 400) +
+			(countIf(duration > 500000000 AND duration <= 2000000000 AND status_code < 400) * 0.5)
+			as satisfied_tolerating
+	FROM transactions
+	WHERE project_id = ? AND endpoint = ? AND recorded_at >= ? AND recorded_at <= ?`
+
+	var stats models.EndpointDetailStats
+	var count uint64
+	var satisfiedTolerating float64
+
+	err := (*chdb.Conn).QueryRow(ctx, query, projectId, endpoint, start, end).Scan(
+		&count,
+		&stats.AvgDuration,
+		&stats.MedianDuration,
+		&stats.P95Duration,
+		&stats.P99Duration,
+		&stats.ErrorRate,
+		&satisfiedTolerating,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	stats.Count = int64(count)
+	// Calculate Apdex: (satisfied + tolerating*0.5) / total
+	if count > 0 {
+		stats.Apdex = satisfiedTolerating / float64(count)
+	}
+	// Calculate throughput (requests per minute)
+	stats.Throughput = float64(count) / durationMinutes
+
+	return &stats, nil
+}
+
 var TransactionRepository = transactionRepository{}

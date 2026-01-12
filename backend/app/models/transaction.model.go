@@ -25,3 +25,15 @@ type EndpointStats struct {
 	AvgDuration time.Duration `json:"avgDuration"`
 	LastSeen    time.Time     `json:"lastSeen"`
 }
+
+// EndpointDetailStats contains detailed statistics for a specific endpoint
+type EndpointDetailStats struct {
+	Count          int64   `json:"count"`
+	AvgDuration    float64 `json:"avgDuration"`    // in ms
+	MedianDuration float64 `json:"medianDuration"` // in ms
+	P95Duration    float64 `json:"p95Duration"`    // in ms
+	P99Duration    float64 `json:"p99Duration"`    // in ms
+	Apdex          float64 `json:"apdex"`          // 0-1 score
+	ErrorRate      float64 `json:"errorRate"`      // percentage
+	Throughput     float64 `json:"throughput"`     // requests per minute
+}

@@ -30,6 +30,12 @@ type EndpointTransactionsRequest struct {
 	Pagination    PaginationParams `json:"pagination"`
 }
 
+type EndpointTransactionsResponse struct {
+	Data       []models.Transaction       `json:"data"`
+	Stats      *models.EndpointDetailStats `json:"stats"`
+	Pagination Pagination                 `json:"pagination"`
+}
+
 func (e transactionController) FindAllTransactions(c *gin.Context) {
 	var request TransactionSearchRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -100,8 +106,16 @@ func (e transactionController) FindByEndpoint(c *gin.Context) {
 		panic(err)
 	}
 
-	c.JSON(http.StatusOK, PaginatedResponse[models.Transaction]{
-		Data: transactions,
+	// Get aggregate stats for this endpoint
+	stats, err := repositories.TransactionRepository.GetEndpointStats(c, request.ProjectId, endpoint, request.FromDate, request.ToDate)
+	if err != nil {
+		// Don't fail the request if stats fail, just return nil stats
+		stats = nil
+	}
+
+	c.JSON(http.StatusOK, EndpointTransactionsResponse{
+		Data:  transactions,
+		Stats: stats,
 		Pagination: Pagination{
 			Page:       request.Pagination.Page,
 			PageSize:   request.Pagination.PageSize,

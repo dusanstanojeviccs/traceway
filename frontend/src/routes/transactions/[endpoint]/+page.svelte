@@ -26,12 +26,24 @@
         appVersion: string;
     };
 
+    type EndpointStats = {
+        count: number;
+        avgDuration: number;
+        medianDuration: number;
+        p95Duration: number;
+        p99Duration: number;
+        apdex: number;
+        errorRate: number;
+        throughput: number;
+    };
+
     type SortField = 'recorded_at' | 'duration' | 'status_code' | 'body_size';
     type SortDirection = 'asc' | 'desc';
 
     let { data } = $props();
 
     let transactions = $state<Transaction[]>([]);
+    let stats = $state<EndpointStats | null>(null);
     let loading = $state(true);
     let error = $state('');
     let notFound = $state(false);
@@ -140,6 +152,16 @@
         }
     }
 
+    function formatDurationMs(ms: number): string {
+        if (ms < 1) {
+            return `${(ms * 1000).toFixed(0)} µs`;
+        } else if (ms < 1000) {
+            return `${ms.toFixed(0)} ms`;
+        } else {
+            return `${(ms / 1000).toFixed(2)} s`;
+        }
+    }
+
     function formatBytes(bytes: number): string {
         if (bytes < 1024) {
             return `${bytes} B`;
@@ -183,6 +205,7 @@
             const response = await api.post(`/transactions/endpoint?endpoint=${encodeURIComponent(data.endpoint)}`, requestBody, { projectId: projectsState.currentProjectId ?? undefined });
 
             transactions = response.data || [];
+            stats = response.stats || null;
             total = response.pagination.total;
             totalPages = response.pagination.totalPages;
         } catch (e: any) {
@@ -287,6 +310,49 @@
             onApply={handleTimeRangeChange}
         />
     </div>
+
+    <!-- Endpoint Stats -->
+    {#if stats}
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            <div class="space-y-1">
+                <p class="text-2xl font-semibold tracking-tight">{formatDurationMs(stats.avgDuration)}</p>
+                <p class="text-xs text-muted-foreground">Average response time</p>
+            </div>
+            <div class="space-y-1">
+                <p class="text-2xl font-semibold tracking-tight">{formatDurationMs(stats.medianDuration)}</p>
+                <p class="text-xs text-muted-foreground">Median response time</p>
+            </div>
+            <div class="space-y-1">
+                <p class="text-2xl font-semibold tracking-tight">{formatDurationMs(stats.p95Duration)}</p>
+                <p class="text-xs text-muted-foreground">95th percentile response time</p>
+            </div>
+            <div class="space-y-1">
+                <p class="text-2xl font-semibold tracking-tight">{formatDurationMs(stats.p99Duration)}</p>
+                <p class="text-xs text-muted-foreground">99th percentile response time</p>
+            </div>
+            <div class="space-y-1">
+                <p class="text-2xl font-semibold tracking-tight">{stats.apdex.toFixed(2)}</p>
+                <p class="text-xs text-muted-foreground">Apdex score</p>
+            </div>
+            <div class="space-y-1">
+                <p class="text-2xl font-semibold tracking-tight">{stats.errorRate.toFixed(2)} %</p>
+                <p class="text-xs text-muted-foreground">Average error rate</p>
+            </div>
+            <div class="space-y-1">
+                <p class="text-2xl font-semibold tracking-tight">{stats.throughput.toFixed(0)} rpm</p>
+                <p class="text-xs text-muted-foreground">Average throughput</p>
+            </div>
+        </div>
+    {:else if loading}
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            {#each Array(7) as _}
+                <div class="space-y-1">
+                    <Skeleton class="h-8 w-20" />
+                    <Skeleton class="h-3 w-32" />
+                </div>
+            {/each}
+        </div>
+    {/if}
 
     <!-- Transactions Table -->
     <div class="rounded-md border overflow-hidden">
