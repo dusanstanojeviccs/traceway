@@ -9,11 +9,15 @@
 	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { projectsState } from '$lib/state/projects.svelte';
+	import { getTimezone } from '$lib/state/timezone.svelte';
 	import IssueTrendChart from '$lib/components/issue-trend-chart.svelte';
 	import Archive from '@lucide/svelte/icons/archive';
 	import { TracewayTableHeader } from '$lib/components/ui/traceway-table-header';
 	import { TableEmptyState } from '$lib/components/ui/table-empty-state';
 	import { PaginationFooter } from '$lib/components/ui/pagination-footer';
+	import { formatDateTime, getNow, toUTCISO } from '$lib/utils/formatters';
+
+	const timezone = $derived(getTimezone());
 
 	type ExceptionTrendPoint = {
 		timestamp: string;
@@ -79,13 +83,12 @@
 		error = '';
 
 		try {
-			const now = new Date();
-			const fromDate = new Date();
-			fromDate.setDate(now.getDate() - parseInt(daysBack));
+			const now = getNow(timezone);
+			const fromDate = now.minus({ days: parseInt(daysBack) });
 
 			const requestBody = {
-				fromDate: fromDate.toISOString(),
-				toDate: now.toISOString(),
+				fromDate: toUTCISO(fromDate),
+				toDate: toUTCISO(now),
 				orderBy: 'last_seen',
 				pagination: {
 					page: page,
@@ -335,7 +338,7 @@
 								class="text-muted-foreground"
 								onclick={createRowClickHandler(`/issues/${exception.exceptionHash}`)}
 							>
-								{new Date(exception.lastSeen).toLocaleString()}
+								{formatDateTime(exception.lastSeen, { timezone })}
 							</Table.Cell>
 						</Table.Row>
 					{/each}

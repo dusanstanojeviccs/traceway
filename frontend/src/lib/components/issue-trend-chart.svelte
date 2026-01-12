@@ -1,11 +1,16 @@
 <script lang="ts">
 	import * as Tooltip from "$lib/components/ui/tooltip";
+	import { formatDateTime, getNow } from '$lib/utils/formatters';
+	import { getTimezone } from '$lib/state/timezone.svelte';
 
 	type TrendPoint = { timestamp: string; count: number };
 
-	let { trend = [] }: {
+	let { trend = [], timezone }: {
 		trend: TrendPoint[];
+		timezone?: string;
 	} = $props();
+
+	const tz = $derived(timezone ?? getTimezone());
 
 	// Always 24 hours
 	const HOURS = 24;
@@ -13,7 +18,7 @@
 
 	// Build 24-hour data array, filling gaps with 0
 	const hourlyData = $derived(() => {
-		const now = new Date();
+		const nowDt = getNow(tz);
 		const result: { hour: Date; count: number }[] = [];
 
 		// Create a map of hour -> count from trend data
@@ -26,9 +31,8 @@
 
 		// Generate last 24 hours
 		for (let i = HOURS - 1; i >= 0; i--) {
-			const hour = new Date(now);
-			hour.setMinutes(0, 0, 0);
-			hour.setHours(hour.getHours() - i);
+			const hourDt = nowDt.minus({ hours: i }).startOf('hour');
+			const hour = hourDt.toJSDate();
 			const key = `${hour.getFullYear()}-${hour.getMonth()}-${hour.getDate()}-${hour.getHours()}`;
 			result.push({
 				hour,
@@ -90,14 +94,7 @@
 				<Tooltip.Content side="top" class="py-2 px-3 !animate-none !transition-none">
 					<div class="font-medium text-sm">{point.count} {point.count === 1 ? 'Event' : 'Events'}</div>
 					<div class="text-muted-foreground text-xs">
-						{point.hour.toLocaleString(undefined, {
-							month: 'short',
-							day: 'numeric',
-							year: 'numeric',
-							hour: 'numeric',
-							minute: '2-digit',
-							timeZoneName: 'short'
-						})}
+						{formatDateTime(point.hour, { timezone: tz, format: 'full' })}
 					</div>
 				</Tooltip.Content>
 			</Tooltip.Root>

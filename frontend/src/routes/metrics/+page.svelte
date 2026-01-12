@@ -16,9 +16,13 @@
 	import { api } from '$lib/api';
 	import { ErrorDisplay } from '$lib/components/ui/error-display';
 	import { projectsState } from '$lib/state/projects.svelte';
+	import { getTimezone } from '$lib/state/timezone.svelte';
+	import { getNow, parseISO, toUTCISO, calendarDateTimeToLuxon, formatDateTime } from '$lib/utils/formatters';
 	import { TimeRangePicker } from '$lib/components/ui/time-range-picker';
 	import { CalendarDate } from '@internationalized/date';
 	import { getServerColorMap } from '$lib/utils/server-colors';
+
+	const timezone = $derived(getTimezone());
 
 	let dashboardData = $state<DashboardData | null>(null);
 	let loading = $state(true);
@@ -47,11 +51,11 @@
 	};
 
 	// Calculate time range from preset
-	function getTimeRangeFromPreset(presetValue: string): { from: Date; to: Date } {
+	function getTimeRangeFromPresetLocal(presetValue: string): { from: Date; to: Date } {
 		const minutes = presetMinutes[presetValue] || 360; // Default to 6h
-		const now = new Date();
-		const from = new Date(now.getTime() - minutes * 60 * 1000);
-		return { from, to: now };
+		const now = getNow(timezone);
+		const from = now.minus({ minutes });
+		return { from: from.toJSDate(), to: now.toJSDate() };
 	}
 
 	// Parse URL params
@@ -78,10 +82,10 @@
 
 		// If custom from/to specified
 		if (fromParam && toParam) {
-			const from = new Date(fromParam);
-			const to = new Date(toParam);
-			if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
-				return { preset: null, from, to, servers };
+			const fromDt = parseISO(fromParam, timezone);
+			const toDt = parseISO(toParam, timezone);
+			if (fromDt.isValid && toDt.isValid) {
+				return { preset: null, from: fromDt.toJSDate(), to: toDt.toJSDate(), servers };
 			}
 		}
 
@@ -100,7 +104,7 @@
 	// Initialize from URL or defaults
 	const initialUrlParams = parseUrlParams();
 	const initialRange = initialUrlParams.preset
-		? getTimeRangeFromPreset(initialUrlParams.preset)
+		? getTimeRangeFromPresetLocal(initialUrlParams.preset)
 		: { from: initialUrlParams.from!, to: initialUrlParams.to! };
 
 	let selectedPreset = $state<string | null>(initialUrlParams.preset);
@@ -121,10 +125,8 @@
 			params.set('preset', selectedPreset);
 		} else {
 			// Store custom from/to in URL
-			const fromDateTime = new Date(getFromDateTime());
-			const toDateTime = new Date(getToDateTime());
-			params.set('from', fromDateTime.toISOString());
-			params.set('to', toDateTime.toISOString());
+			params.set('from', getFromDateTimeUTC());
+			params.set('to', getToDateTimeUTC());
 		}
 
 		// Store server selection in URL (only if not all servers selected)
@@ -147,7 +149,7 @@
 
 		if (urlParams.preset) {
 			selectedPreset = urlParams.preset;
-			const range = getTimeRangeFromPreset(urlParams.preset);
+			const range = getTimeRangeFromPresetLocal(urlParams.preset);
 			fromDate = dateToCalendarDate(range.from);
 			fromTime = dateToTimeString(range.from);
 			toDate = dateToCalendarDate(range.to);
@@ -166,15 +168,17 @@
 		loadDashboard(false); // Don't push to history on popstate
 	}
 
-	// Combine date and time into ISO datetime string
-	function getFromDateTime(): string {
-		const dateStr = `${fromDate.year}-${String(fromDate.month).padStart(2, '0')}-${String(fromDate.day).padStart(2, '0')}`;
-		return `${dateStr}T${fromTime || '00:00'}`;
+	// Combine date and time into UTC ISO datetime string
+	function getFromDateTimeUTC(): string {
+		const [hour, minute] = (fromTime || '00:00').split(':').map(Number);
+		const dt = calendarDateTimeToLuxon({ year: fromDate.year, month: fromDate.month, day: fromDate.day, hour, minute }, timezone);
+		return toUTCISO(dt);
 	}
 
-	function getToDateTime(): string {
-		const dateStr = `${toDate.year}-${String(toDate.month).padStart(2, '0')}-${String(toDate.day).padStart(2, '0')}`;
-		return `${dateStr}T${toTime || '23:59'}`;
+	function getToDateTimeUTC(): string {
+		const [hour, minute] = (toTime || '23:59').split(':').map(Number);
+		const dt = calendarDateTimeToLuxon({ year: toDate.year, month: toDate.month, day: toDate.day, hour, minute }, timezone);
+		return toUTCISO(dt);
 	}
 
 	function handleTimeRangeChange(
@@ -214,14 +218,14 @@
 		updateUrl(pushToHistory);
 
 		try {
-			const fromDateTime = new Date(getFromDateTime());
-			const toDateTime = new Date(getToDateTime());
+			const fromDateTimeUTC = getFromDateTimeUTC();
+			const toDateTimeUTC = getToDateTimeUTC();
 
 			// Store shared time domain for charts
-			sharedTimeDomain = [fromDateTime, toDateTime];
+			sharedTimeDomain = [new Date(fromDateTimeUTC), new Date(toDateTimeUTC)];
 
 			// Build query params for date range and server selection
-			let queryParams = `fromDate=${fromDateTime.toISOString()}&toDate=${toDateTime.toISOString()}`;
+			let queryParams = `fromDate=${fromDateTimeUTC}&toDate=${toDateTimeUTC}`;
 			if (selectedServers.length > 0 && selectedServers.length < availableServers.length) {
 				queryParams += `&servers=${selectedServers.join(',')}`;
 			}
@@ -295,12 +299,7 @@
 
 	const lastUpdatedFormatted = $derived(
 		dashboardData?.lastUpdated
-			? dashboardData.lastUpdated.toLocaleString('en-US', {
-					hour: '2-digit',
-					minute: '2-digit',
-					second: '2-digit',
-					hour12: false
-				})
+			? formatDateTime(dashboardData.lastUpdated, { timezone, format: 'time' })
 			: ''
 	);
 </script>

@@ -4,10 +4,14 @@
     import { LoadingCircle } from "$lib/components/ui/loading-circle";
     import { ErrorDisplay } from "$lib/components/ui/error-display";
     import { projectsState } from '$lib/state/projects.svelte';
+    import { getTimezone } from '$lib/state/timezone.svelte';
+    import { formatDateTime } from '$lib/utils/formatters';
     import { StackTraceCard, EventCard, EventsTable, PageHeader } from '$lib/components/issues';
     import type { ExceptionGroup, ExceptionOccurrence, LinkedTransaction } from '$lib/types/exceptions';
 
     let { data } = $props();
+
+    const timezone = $derived(getTimezone());
 
     let group = $state<ExceptionGroup | null>(null);
     let occurrence = $state<ExceptionOccurrence | null>(null);
@@ -90,7 +94,7 @@
 <div class="space-y-6">
     <PageHeader
         title={firstLineOfStackTrace}
-        subtitle="Event from {new Date(data.recordedAt).toLocaleString()}"
+        subtitle="Event from {formatDateTime(data.recordedAt, { timezone })}"
         backHref="/issues/{data.exceptionHash}"
     />
 

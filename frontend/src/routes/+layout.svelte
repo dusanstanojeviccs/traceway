@@ -4,6 +4,7 @@
 	import { authState } from '$lib/state/auth.svelte';
 	import { projectsState } from '$lib/state/projects.svelte';
 	import { themeState, initTheme, toggleTheme } from '$lib/state/theme.svelte';
+	import { initTimezone } from '$lib/state/timezone.svelte';
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
 	import AddProjectModal from '$lib/components/add-project-modal.svelte';
 	import FrameworkIcon from '$lib/components/framework-icon.svelte';
@@ -19,6 +20,7 @@
 
 	onMount(() => {
 		initTheme();
+		initTimezone();
 
 		// Load projects after auth check
 		if (authState.isAuthenticated) {

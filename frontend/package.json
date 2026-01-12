@@ -26,6 +26,7 @@
 		"@types/d3-array": "^3.2.2",
 		"@types/d3-scale": "^4.0.9",
 		"@types/d3-shape": "^3.1.7",
+		"@types/luxon": "^3.7.1",
 		"@types/node": "^22",
 		"bits-ui": "^2.14.4",
 		"clsx": "^2.1.1",
@@ -53,6 +54,7 @@
 	},
 	"dependencies": {
 		"lucide-svelte": "^0.562.0",
+		"luxon": "^3.7.2",
 		"svelte-highlight": "^7.9.0"
 	}
 }

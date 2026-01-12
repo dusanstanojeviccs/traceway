@@ -2,7 +2,8 @@
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { api } from '$lib/api';
-    import { formatDuration, formatDurationMs, getStatusColor } from '$lib/utils/formatters';
+    import { formatDuration, formatDurationMs, getStatusColor, formatDateTime, getNow, parseISO, toUTCISO, calendarDateTimeToLuxon } from '$lib/utils/formatters';
+    import { getTimezone } from '$lib/state/timezone.svelte';
     import * as Table from "$lib/components/ui/table";
     import { Button } from "$lib/components/ui/button";
     import { LoadingCircle } from "$lib/components/ui/loading-circle";
@@ -15,6 +16,8 @@
     import { projectsState } from '$lib/state/projects.svelte';
     import ScopeDisplay from '$lib/components/scope-display.svelte';
     import { createRowClickHandler } from '$lib/utils/navigation';
+
+    const timezone = $derived(getTimezone());
 
     type Transaction = {
         id: string;
@@ -73,11 +76,11 @@
     };
 
     // Helper functions
-    function getTimeRangeFromPreset(presetValue: string): { from: Date; to: Date } {
+    function getTimeRangeFromPresetLocal(presetValue: string): { from: Date; to: Date } {
         const minutes = presetMinutes[presetValue] || 360;
-        const now = new Date();
-        const from = new Date(now.getTime() - minutes * 60 * 1000);
-        return { from, to: now };
+        const now = getNow(timezone);
+        const from = now.minus({ minutes });
+        return { from: from.toJSDate(), to: now.toJSDate() };
     }
 
     function dateToCalendarDate(date: Date): CalendarDate {
@@ -92,21 +95,21 @@
     function getInitialRange(): { preset: string | null; from: Date; to: Date } {
         // If preset is provided, use it
         if (data.preset && presetMinutes[data.preset]) {
-            const range = getTimeRangeFromPreset(data.preset);
+            const range = getTimeRangeFromPresetLocal(data.preset);
             return { preset: data.preset, from: range.from, to: range.to };
         }
 
         // If custom from/to provided
         if (data.from && data.to) {
-            const from = new Date(data.from);
-            const to = new Date(data.to);
-            if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
-                return { preset: null, from, to };
+            const fromDt = parseISO(data.from, timezone);
+            const toDt = parseISO(data.to, timezone);
+            if (fromDt.isValid && toDt.isValid) {
+                return { preset: null, from: fromDt.toJSDate(), to: toDt.toJSDate() };
             }
         }
 
         // Default to 6h preset
-        const range = getTimeRangeFromPreset('6h');
+        const range = getTimeRangeFromPresetLocal('6h');
         return { preset: '6h', from: range.from, to: range.to };
     }
 
@@ -123,15 +126,17 @@
     let orderBy = $state<SortField>('recorded_at');
     let sortDirection = $state<SortDirection>('desc');
 
-    // Combine date and time into ISO datetime string
-    function getFromDateTime(): string {
-        const dateStr = `${fromDate.year}-${String(fromDate.month).padStart(2, '0')}-${String(fromDate.day).padStart(2, '0')}`;
-        return `${dateStr}T${fromTime || '00:00'}`;
+    // Combine date and time into UTC ISO datetime string
+    function getFromDateTimeUTC(): string {
+        const [hour, minute] = (fromTime || '00:00').split(':').map(Number);
+        const dt = calendarDateTimeToLuxon({ year: fromDate.year, month: fromDate.month, day: fromDate.day, hour, minute }, timezone);
+        return toUTCISO(dt);
     }
 
-    function getToDateTime(): string {
-        const dateStr = `${toDate.year}-${String(toDate.month).padStart(2, '0')}-${String(toDate.day).padStart(2, '0')}`;
-        return `${dateStr}T${toTime || '23:59'}`;
+    function getToDateTimeUTC(): string {
+        const [hour, minute] = (toTime || '23:59').split(':').map(Number);
+        const dt = calendarDateTimeToLuxon({ year: toDate.year, month: toDate.month, day: toDate.day, hour, minute }, timezone);
+        return toUTCISO(dt);
     }
 
     function handleTimeRangeChange(from: { date: CalendarDate; time: string }, to: { date: CalendarDate; time: string }, preset: string | null) {
@@ -162,8 +167,8 @@
 
         try {
             const requestBody = {
-                fromDate: new Date(getFromDateTime()).toISOString(),
-                toDate: new Date(getToDateTime()).toISOString(),
+                fromDate: getFromDateTimeUTC(),
+                toDate: getToDateTimeUTC(),
                 orderBy: orderBy,
                 sortDirection: sortDirection,
                 pagination: {
@@ -216,8 +221,8 @@
         if (selectedPreset) {
             params.set('preset', selectedPreset);
         } else {
-            params.set('from', new Date(getFromDateTime()).toISOString());
-            params.set('to', new Date(getToDateTime()).toISOString());
+            params.set('from', getFromDateTimeUTC());
+            params.set('to', getToDateTimeUTC());
         }
         goto(`/transactions?${params.toString()}`);
     }
@@ -228,8 +233,8 @@
         if (selectedPreset) {
             params.set('preset', selectedPreset);
         } else {
-            params.set('from', new Date(getFromDateTime()).toISOString());
-            params.set('to', new Date(getToDateTime()).toISOString());
+            params.set('from', getFromDateTimeUTC());
+            params.set('to', getToDateTimeUTC());
         }
         return `/transactions/${encodeURIComponent(data.endpoint)}/${transactionId}?${params.toString()}`;
     }
@@ -382,7 +387,7 @@
                             onclick={createRowClickHandler(getTransactionDetailUrl(transaction.id))}
                         >
                             <Table.Cell class="text-muted-foreground">
-                                {new Date(transaction.recordedAt).toLocaleString()}
+                                {formatDateTime(transaction.recordedAt, { timezone })}
                             </Table.Cell>
                             <Table.Cell class="font-mono text-sm">
                                 {formatDuration(transaction.duration)}

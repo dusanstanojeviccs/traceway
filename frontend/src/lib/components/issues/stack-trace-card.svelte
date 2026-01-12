@@ -1,5 +1,7 @@
 <script lang="ts">
     import * as Card from "$lib/components/ui/card";
+    import { formatDateTime } from '$lib/utils/formatters';
+    import { getTimezone } from '$lib/state/timezone.svelte';
 
     interface Props {
         stackTrace: string;
@@ -7,10 +9,12 @@
         firstSeen?: string;
         lastSeen?: string;
         totalCount?: number;
+        timezone?: string;
     }
 
-    let { stackTrace, isMessage = false, firstSeen, lastSeen, totalCount }: Props = $props();
+    let { stackTrace, isMessage = false, firstSeen, lastSeen, totalCount, timezone }: Props = $props();
 
+    const tz = $derived(timezone ?? getTimezone());
     const showStats = $derived(firstSeen && lastSeen && totalCount !== undefined);
 </script>
 
@@ -26,8 +30,8 @@
         </div>
         {#if showStats}
             <Card.Description>
-                First seen: {new Date(firstSeen!).toLocaleString()} ·
-                Last seen: {new Date(lastSeen!).toLocaleString()} ·
+                First seen: {formatDateTime(firstSeen!, { timezone: tz })} ·
+                Last seen: {formatDateTime(lastSeen!, { timezone: tz })} ·
                 Total occurrences: {totalCount}
             </Card.Description>
         {/if}

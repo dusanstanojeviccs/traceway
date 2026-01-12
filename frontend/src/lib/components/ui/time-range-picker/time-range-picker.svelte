@@ -4,6 +4,8 @@
     import * as Popover from "$lib/components/ui/popover";
     import { Clock, ChevronDown, ChevronRight, Check } from "@lucide/svelte";
     import { CalendarDate, CalendarDateTime, getLocalTimeZone, today } from "@internationalized/date";
+    import { getNow, luxonToCalendarDateTime } from "$lib/utils/formatters";
+    import { getTimezone } from "$lib/state/timezone.svelte";
 
     type TimeRangePreset = {
         value: string;
@@ -21,6 +23,7 @@
         fromTime?: string;
         toTime?: string;
         preset?: string | null;
+        timezone?: string;
         onApply?: (from: { date: CalendarDate; time: string }, to: { date: CalendarDate; time: string }, preset: string | null) => void;
     }
 
@@ -30,8 +33,11 @@
         fromTime = $bindable('00:00'),
         toTime = $bindable('23:59'),
         preset = $bindable<string | null>('6h'),
+        timezone,
         onApply
     }: Props = $props();
+
+    const tz = $derived(timezone ?? getTimezone());
 
     // Preset groups
     const presetGroups: PresetGroup[] = [
@@ -80,24 +86,26 @@
             if (preset) {
                 const presetDef = presetGroups.flatMap(g => g.presets).find(p => p.value === preset);
                 if (presetDef) {
-                    const now = new Date();
-                    const fromDateTime = new Date(now.getTime() - presetDef.minutes * 60 * 1000);
+                    const now = getNow(tz);
+                    const fromDt = now.minus({ minutes: presetDef.minutes });
+                    const fromParts = luxonToCalendarDateTime(fromDt);
+                    const toParts = luxonToCalendarDateTime(now);
 
                     tempFromDateTime = new CalendarDateTime(
-                        fromDateTime.getFullYear(),
-                        fromDateTime.getMonth() + 1,
-                        fromDateTime.getDate(),
-                        fromDateTime.getHours(),
-                        fromDateTime.getMinutes(),
-                        fromDateTime.getSeconds()
+                        fromParts.year,
+                        fromParts.month,
+                        fromParts.day,
+                        fromParts.hour,
+                        fromParts.minute,
+                        fromParts.second
                     );
                     tempToDateTime = new CalendarDateTime(
-                        now.getFullYear(),
-                        now.getMonth() + 1,
-                        now.getDate(),
-                        now.getHours(),
-                        now.getMinutes(),
-                        now.getSeconds()
+                        toParts.year,
+                        toParts.month,
+                        toParts.day,
+                        toParts.hour,
+                        toParts.minute,
+                        toParts.second
                     );
                 }
             }
@@ -218,26 +226,28 @@
         preset = presetDef.value; // Sync with external prop
         showCustom = false;
 
-        // Calculate the date range for this preset
-        const now = new Date();
-        const fromDateTime = new Date(now.getTime() - presetDef.minutes * 60 * 1000);
+        // Calculate the date range for this preset using Luxon
+        const now = getNow(tz);
+        const fromDt = now.minus({ minutes: presetDef.minutes });
+        const fromParts = luxonToCalendarDateTime(fromDt);
+        const toParts = luxonToCalendarDateTime(now);
 
         // Update temp values only - don't close or apply yet
         tempFromDateTime = new CalendarDateTime(
-            fromDateTime.getFullYear(),
-            fromDateTime.getMonth() + 1,
-            fromDateTime.getDate(),
-            fromDateTime.getHours(),
-            fromDateTime.getMinutes(),
-            fromDateTime.getSeconds()
+            fromParts.year,
+            fromParts.month,
+            fromParts.day,
+            fromParts.hour,
+            fromParts.minute,
+            fromParts.second
         );
         tempToDateTime = new CalendarDateTime(
-            now.getFullYear(),
-            now.getMonth() + 1,
-            now.getDate(),
-            now.getHours(),
-            now.getMinutes(),
-            now.getSeconds()
+            toParts.year,
+            toParts.month,
+            toParts.day,
+            toParts.hour,
+            toParts.minute,
+            toParts.second
         );
     }
 
@@ -250,10 +260,11 @@
     }
 
     function resetToNow() {
-        const now = new Date();
+        const now = getNow(tz);
+        const nowParts = luxonToCalendarDateTime(now);
         tempToDateTime = new CalendarDateTime(
-            now.getFullYear(), now.getMonth() + 1, now.getDate(),
-            now.getHours(), now.getMinutes(), now.getSeconds()
+            nowParts.year, nowParts.month, nowParts.day,
+            nowParts.hour, nowParts.minute, nowParts.second
         );
     }
 

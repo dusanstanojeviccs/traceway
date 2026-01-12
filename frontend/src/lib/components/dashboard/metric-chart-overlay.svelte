@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { formatDateTime } from '$lib/utils/formatters';
+	import { getTimezone } from '$lib/state/timezone.svelte';
 
 	type DataPoint = {
 		timestamp: Date;
@@ -14,7 +16,8 @@
 		chartPadding = { left: 20, right: 4 },
 		data = [],
 		unit = '',
-		formatValue
+		formatValue,
+		timezone
 	} = $props<{
 		fromTime: Date;
 		toTime: Date;
@@ -24,7 +27,10 @@
 		data?: DataPoint[];
 		unit?: string;
 		formatValue?: (value: number) => string;
+		timezone?: string;
 	}>();
+
+	const tz = $derived(timezone ?? getTimezone());
 
 	let containerRef = $state<HTMLDivElement | null>(null);
 	let isHovering = $state(false);
@@ -226,7 +232,7 @@
 	// Format time for display
 	function formatTime(date: Date | null): string {
 		if (!date) return '';
-		return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+		return formatDateTime(date, { timezone: tz, format: 'time' });
 	}
 </script>
 

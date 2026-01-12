@@ -2,7 +2,8 @@
     import { onMount, onDestroy } from 'svelte';
     import { browser } from '$app/environment';
     import { api } from '$lib/api';
-    import { formatDuration } from '$lib/utils/formatters';
+    import { formatDuration, getNow, luxonToCalendarDateTime, parseISO, toUTCISO, calendarDateTimeToLuxon } from '$lib/utils/formatters';
+    import { getTimezone } from '$lib/state/timezone.svelte';
     import * as Table from "$lib/components/ui/table";
     import { Button } from "$lib/components/ui/button";
     import { LoadingCircle } from "$lib/components/ui/loading-circle";
@@ -14,6 +15,8 @@
     import { TimeRangePicker } from "$lib/components/ui/time-range-picker";
     import { CalendarDate, getLocalTimeZone, today } from "@internationalized/date";
     import { projectsState } from '$lib/state/projects.svelte';
+
+    const timezone = $derived(getTimezone());
 
     type EndpointStats = {
         endpoint: string;
@@ -52,11 +55,11 @@
     };
 
     // Helper functions
-    function getTimeRangeFromPreset(presetValue: string): { from: Date; to: Date } {
+    function getTimeRangeFromPresetLocal(presetValue: string): { from: Date; to: Date } {
         const minutes = presetMinutes[presetValue] || 360;
-        const now = new Date();
-        const from = new Date(now.getTime() - minutes * 60 * 1000);
-        return { from, to: now };
+        const now = getNow(timezone);
+        const from = now.minus({ minutes });
+        return { from: from.toJSDate(), to: now.toJSDate() };
     }
 
     function dateToCalendarDate(date: Date): CalendarDate {
@@ -82,10 +85,10 @@
 
         // If custom from/to specified
         if (fromParam && toParam) {
-            const from = new Date(fromParam);
-            const to = new Date(toParam);
-            if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
-                return { preset: null, from, to };
+            const fromDt = parseISO(fromParam, timezone);
+            const toDt = parseISO(toParam, timezone);
+            if (fromDt.isValid && toDt.isValid) {
+                return { preset: null, from: fromDt.toJSDate(), to: toDt.toJSDate() };
             }
         }
 
@@ -96,7 +99,7 @@
     // Initialize from URL
     const initialUrlParams = parseUrlParams();
     const initialRange = initialUrlParams.preset
-        ? getTimeRangeFromPreset(initialUrlParams.preset)
+        ? getTimeRangeFromPresetLocal(initialUrlParams.preset)
         : { from: initialUrlParams.from!, to: initialUrlParams.to! };
 
     // Date Range State
@@ -115,10 +118,8 @@
         if (selectedPreset) {
             params.set('preset', selectedPreset);
         } else {
-            const fromDateTime = new Date(getFromDateTime());
-            const toDateTime = new Date(getToDateTime());
-            params.set('from', fromDateTime.toISOString());
-            params.set('to', toDateTime.toISOString());
+            params.set('from', getFromDateTimeUTC());
+            params.set('to', getToDateTimeUTC());
         }
 
         const newUrl = `${window.location.pathname}?${params.toString()}`;
@@ -136,7 +137,7 @@
 
         if (urlParams.preset) {
             selectedPreset = urlParams.preset;
-            const range = getTimeRangeFromPreset(urlParams.preset);
+            const range = getTimeRangeFromPresetLocal(urlParams.preset);
             fromDate = dateToCalendarDate(range.from);
             fromTime = dateToTimeString(range.from);
             toDate = dateToCalendarDate(range.to);
@@ -167,15 +168,17 @@
 
     const pageSizeLabel = $derived(pageSizeOptions.find(o => o.value === pageSize.toString())?.label ?? pageSize.toString());
 
-    // Combine date and time into ISO datetime string
-    function getFromDateTime(): string {
-        const dateStr = `${fromDate.year}-${String(fromDate.month).padStart(2, '0')}-${String(fromDate.day).padStart(2, '0')}`;
-        return `${dateStr}T${fromTime || '00:00'}`;
+    // Combine date and time into UTC ISO datetime string
+    function getFromDateTimeUTC(): string {
+        const [hour, minute] = (fromTime || '00:00').split(':').map(Number);
+        const dt = calendarDateTimeToLuxon({ year: fromDate.year, month: fromDate.month, day: fromDate.day, hour, minute }, timezone);
+        return toUTCISO(dt);
     }
 
-    function getToDateTime(): string {
-        const dateStr = `${toDate.year}-${String(toDate.month).padStart(2, '0')}-${String(toDate.day).padStart(2, '0')}`;
-        return `${dateStr}T${toTime || '23:59'}`;
+    function getToDateTimeUTC(): string {
+        const [hour, minute] = (toTime || '23:59').split(':').map(Number);
+        const dt = calendarDateTimeToLuxon({ year: toDate.year, month: toDate.month, day: toDate.day, hour, minute }, timezone);
+        return toUTCISO(dt);
     }
 
     function handleTimeRangeChange(from: { date: CalendarDate; time: string }, to: { date: CalendarDate; time: string }, preset: string | null) {
@@ -218,8 +221,8 @@
 
         try {
             const requestBody = {
-                fromDate: new Date(getFromDateTime()).toISOString(),
-                toDate: new Date(getToDateTime()).toISOString(),
+                fromDate: getFromDateTimeUTC(),
+                toDate: getToDateTimeUTC(),
                 orderBy: orderBy,
                 sortDirection: sortDirection,
                 pagination: {
@@ -272,8 +275,8 @@
         if (selectedPreset) {
             params.set('preset', selectedPreset);
         } else {
-            params.set('from', new Date(getFromDateTime()).toISOString());
-            params.set('to', new Date(getToDateTime()).toISOString());
+            params.set('from', getFromDateTimeUTC());
+            params.set('to', getToDateTimeUTC());
         }
         return `/transactions/${encodeURIComponent(endpoint)}?${params.toString()}`;
     }

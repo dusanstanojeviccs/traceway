@@ -4,7 +4,8 @@
     import * as Card from "$lib/components/ui/card";
     import { ArrowRight } from "lucide-svelte";
     import type { ExceptionOccurrence, LinkedTransaction } from '$lib/types/exceptions';
-    import { formatDuration, getStatusColor } from '$lib/utils/formatters';
+    import { formatDuration, getStatusColor, formatDateTime } from '$lib/utils/formatters';
+    import { getTimezone } from '$lib/state/timezone.svelte';
     import { ContextGrid } from '$lib/components/ui/context-grid';
 
     interface Props {
@@ -12,15 +13,18 @@
         linkedTransaction: LinkedTransaction | null;
         title?: string;
         description?: string;
+        timezone?: string;
     }
 
     let {
         occurrence,
         linkedTransaction,
         title = "Event",
-        description = "Details for this specific occurrence"
+        description = "Details for this specific occurrence",
+        timezone
     }: Props = $props();
 
+    const tz = $derived(timezone ?? getTimezone());
 </script>
 
 <Card.Root>
@@ -33,7 +37,7 @@
         <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div class="space-y-1">
                 <p class="text-sm text-muted-foreground">Recorded At</p>
-                <p class="font-mono text-sm">{new Date(occurrence.recordedAt).toLocaleString()}</p>
+                <p class="font-mono text-sm">{formatDateTime(occurrence.recordedAt, { timezone: tz })}</p>
             </div>
             <div class="space-y-1">
                 <p class="text-sm text-muted-foreground">Server</p>
@@ -78,7 +82,7 @@
                 </div>
                 <div class="space-y-1">
                     <p class="text-sm text-muted-foreground">Recorded</p>
-                    <p class="font-mono text-sm">{new Date(linkedTransaction.recordedAt).toLocaleString()}</p>
+                    <p class="font-mono text-sm">{formatDateTime(linkedTransaction.recordedAt, { timezone: tz })}</p>
                 </div>
             </div>
             <Button variant="outline" size="sm" onclick={() => goto(`/transactions/${encodeURIComponent(linkedTransaction.endpoint)}/${linkedTransaction.id}?preset=24h`)}>

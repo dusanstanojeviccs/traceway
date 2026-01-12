@@ -3,7 +3,8 @@
     import { page } from '$app/state';
     import { goto } from '$app/navigation';
     import { createRowClickHandler } from '$lib/utils/navigation';
-    import { truncateStackTrace } from '$lib/utils/formatters';
+    import { truncateStackTrace, formatDateTime } from '$lib/utils/formatters';
+    import { getTimezone } from '$lib/state/timezone.svelte';
     import { api } from '$lib/api';
     import { Button } from "$lib/components/ui/button";
     import * as Card from "$lib/components/ui/card";
@@ -15,6 +16,8 @@
     import { TracewayTableHeader } from "$lib/components/ui/traceway-table-header";
     import { TableEmptyState } from "$lib/components/ui/table-empty-state";
     import { PaginationFooter } from "$lib/components/ui/pagination-footer";
+
+    const timezone = $derived(getTimezone());
 
     type ExceptionGroup = {
         exceptionHash: string;
@@ -187,7 +190,7 @@
                                 class="cursor-pointer hover:bg-muted/50"
                                 onclick={createRowClickHandler(`/issues/${page.params.exceptionHash}/${encodeURIComponent(occurrence.recordedAt)}`)}
                             >
-                                <Table.Cell>{new Date(occurrence.recordedAt).toLocaleString()}</Table.Cell>
+                                <Table.Cell>{formatDateTime(occurrence.recordedAt, { timezone })}</Table.Cell>
                                 <Table.Cell class="font-mono text-sm text-muted-foreground">
                                     {occurrence.serverName || '-'}
                                 </Table.Cell>

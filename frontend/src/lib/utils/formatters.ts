@@ -1,3 +1,6 @@
+import { DateTime } from 'luxon';
+import { getTimezone } from '$lib/state/timezone.svelte';
+
 export function formatDuration(nanoseconds: number): string {
 	const ms = nanoseconds / 1_000_000;
 	if (ms < 1) {
@@ -34,10 +37,11 @@ export function truncateStackTrace(stackTrace: string, maxLength = 70): string {
 	return firstLine;
 }
 
-export function formatRelativeTime(dateStr: string): string {
-	const date = new Date(dateStr);
-	const now = new Date();
-	const diffMs = now.getTime() - date.getTime();
+export function formatRelativeTime(dateStr: string, timezone?: string): string {
+	const tz = timezone ?? getTimezone();
+	const dt = DateTime.fromISO(dateStr, { zone: 'utc' }).setZone(tz);
+	const now = DateTime.now().setZone(tz);
+	const diffMs = now.toMillis() - dt.toMillis();
 	const diffMins = Math.floor(diffMs / 60000);
 	const diffHours = Math.floor(diffMs / 3600000);
 	const diffDays = Math.floor(diffMs / 86400000);
@@ -46,4 +50,127 @@ export function formatRelativeTime(dateStr: string): string {
 	if (diffMins < 60) return `${diffMins}m`;
 	if (diffHours < 24) return `${diffHours}h`;
 	return `${diffDays}d`;
+}
+
+export type DateTimeFormat = 'full' | 'short' | 'date' | 'time' | 'datetime' | 'iso';
+
+export function formatDateTime(
+	dateInput: string | Date | number,
+	options: {
+		timezone?: string;
+		format?: DateTimeFormat;
+	} = {}
+): string {
+	const tz = options.timezone ?? getTimezone();
+	const isoStr =
+		typeof dateInput === 'string'
+			? dateInput
+			: dateInput instanceof Date
+				? dateInput.toISOString()
+				: new Date(dateInput).toISOString();
+
+	const dt = DateTime.fromISO(isoStr, { zone: 'utc' }).setZone(tz);
+
+	if (!dt.isValid) {
+		return 'Invalid date';
+	}
+
+	switch (options.format) {
+		case 'full':
+			return dt.toLocaleString(DateTime.DATETIME_FULL);
+		case 'short':
+			return dt.toLocaleString(DateTime.DATETIME_SHORT);
+		case 'date':
+			return dt.toLocaleString(DateTime.DATE_MED);
+		case 'time':
+			return dt.toLocaleString(DateTime.TIME_SIMPLE);
+		case 'iso':
+			return dt.toISO() ?? '';
+		case 'datetime':
+		default:
+			return dt.toLocaleString(DateTime.DATETIME_MED);
+	}
+}
+
+export function getNow(timezone?: string): DateTime {
+	const tz = timezone ?? getTimezone();
+	return DateTime.now().setZone(tz);
+}
+
+export function getTimeRangeFromPreset(
+	preset: string,
+	timezone?: string
+): { from: DateTime; to: DateTime } {
+	const tz = timezone ?? getTimezone();
+	const now = DateTime.now().setZone(tz);
+
+	const presetMinutes: Record<string, number> = {
+		'30m': 30,
+		'60m': 60,
+		'3h': 180,
+		'6h': 360,
+		'12h': 720,
+		'24h': 1440,
+		'3d': 4320,
+		'7d': 10080,
+		'1M': 43200,
+		'3M': 129600
+	};
+
+	const minutes = presetMinutes[preset] || 360;
+	const from = now.minus({ minutes });
+
+	return { from, to: now };
+}
+
+export function luxonToCalendarDateTime(dt: DateTime): {
+	year: number;
+	month: number;
+	day: number;
+	hour: number;
+	minute: number;
+	second: number;
+} {
+	return {
+		year: dt.year,
+		month: dt.month,
+		day: dt.day,
+		hour: dt.hour,
+		minute: dt.minute,
+		second: dt.second
+	};
+}
+
+export function calendarDateTimeToLuxon(
+	calDt: {
+		year: number;
+		month: number;
+		day: number;
+		hour?: number;
+		minute?: number;
+		second?: number;
+	},
+	timezone?: string
+): DateTime {
+	const tz = timezone ?? getTimezone();
+	return DateTime.fromObject(
+		{
+			year: calDt.year,
+			month: calDt.month,
+			day: calDt.day,
+			hour: calDt.hour ?? 0,
+			minute: calDt.minute ?? 0,
+			second: calDt.second ?? 0
+		},
+		{ zone: tz }
+	);
+}
+
+export function toUTCISO(dt: DateTime): string {
+	return dt.toUTC().toISO() ?? '';
+}
+
+export function parseISO(dateStr: string, timezone?: string): DateTime {
+	const tz = timezone ?? getTimezone();
+	return DateTime.fromISO(dateStr, { zone: 'utc' }).setZone(tz);
 }

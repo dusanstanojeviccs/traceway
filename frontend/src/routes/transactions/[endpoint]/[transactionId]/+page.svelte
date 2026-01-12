@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api';
-	import { formatDuration, getStatusColor } from '$lib/utils/formatters';
+	import { formatDuration, getStatusColor, formatDateTime } from '$lib/utils/formatters';
+	import { getTimezone } from '$lib/state/timezone.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import { LoadingCircle } from '$lib/components/ui/loading-circle';
@@ -16,6 +17,8 @@
 	import type { TransactionDetailResponse } from '$lib/types/segments';
 
 	let { data } = $props();
+
+	const timezone = $derived(getTimezone());
 
 	let response = $state<TransactionDetailResponse | null>(null);
 	let loading = $state(true);
@@ -147,7 +150,7 @@
 					/>
 					<LabelValue
 						label="Recorded At"
-						value={new Date(response.transaction.recordedAt).toLocaleString()}
+						value={formatDateTime(response.transaction.recordedAt, { timezone })}
 						mono
 					/>
 					<LabelValue

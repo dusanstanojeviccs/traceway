@@ -6,6 +6,8 @@
     import { TableEmptyState } from "$lib/components/ui/table-empty-state";
     import { ViewAllTableRow } from "$lib/components/ui/view-all-table-row";
     import type { ExceptionOccurrence } from '$lib/types/exceptions';
+    import { formatDateTime } from '$lib/utils/formatters';
+    import { getTimezone } from '$lib/state/timezone.svelte';
 
     interface Props {
         occurrences: ExceptionOccurrence[];
@@ -14,6 +16,7 @@
         hasMore?: boolean;
         showViewAll?: boolean;
         currentRecordedAt?: string;
+        timezone?: string;
     }
 
     let {
@@ -22,8 +25,11 @@
         total,
         hasMore = false,
         showViewAll = true,
-        currentRecordedAt
+        currentRecordedAt,
+        timezone
     }: Props = $props();
+
+    const tz = $derived(timezone ?? getTimezone());
 
     function getRowUrl(occurrence: ExceptionOccurrence): string {
         return `/issues/${exceptionHash}/${encodeURIComponent(occurrence.recordedAt)}`;
@@ -70,7 +76,7 @@
                                 onclick={createRowClickHandler(getRowUrl(occurrence))}
                             >
                                 <Table.Cell>
-                                    {new Date(occurrence.recordedAt).toLocaleString()}
+                                    {formatDateTime(occurrence.recordedAt, { timezone: tz })}
                                     {#if isCurrentEvent(occurrence)}
                                         <span class="ml-2 text-xs text-muted-foreground">(current)</span>
                                     {/if}
