@@ -4,10 +4,11 @@
 	import { api } from '$lib/api';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import { ErrorDisplay } from '$lib/components/ui/error-display';
 	import { projectsState } from '$lib/state/projects.svelte';
 	import { ArrowLeft, ArrowRight, TriangleAlert } from 'lucide-svelte';
+	import { LabelValue } from '$lib/components/ui/label-value';
 	import SegmentWaterfall from '$lib/components/segments/segment-waterfall.svelte';
 	import SegmentEmptyState from '$lib/components/segments/segment-empty-state.svelte';
 	import type { TransactionDetailResponse } from '$lib/types/segments';
@@ -110,16 +111,9 @@
 	</div>
 
 	{#if loading}
-		<Card.Root>
-			<Card.Header>
-				<Skeleton class="h-6 w-48" />
-			</Card.Header>
-			<Card.Content>
-				<Skeleton class="mb-2 h-4 w-full" />
-				<Skeleton class="mb-2 h-4 w-3/4" />
-				<Skeleton class="h-32 w-full" />
-			</Card.Content>
-		</Card.Root>
+		<div class="flex items-center justify-center py-20">
+			<LoadingCircle size="xlg" />
+		</div>
 	{:else if notFound}
 		<ErrorDisplay
 			status={404}
@@ -148,44 +142,50 @@
 			</Card.Header>
 			<Card.Content class="space-y-6">
 				<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-					<div class="space-y-1">
-						<p class="text-sm text-muted-foreground">Endpoint</p>
-						<p class="truncate font-mono text-sm" title={decodeURIComponent(data.endpoint)}>
-							{decodeURIComponent(data.endpoint)}
-						</p>
-					</div>
-					<div class="space-y-1">
-						<p class="text-sm text-muted-foreground">Status</p>
-						<p class="font-mono {getStatusColor(response.transaction.statusCode)}">
-							{response.transaction.statusCode}
-						</p>
-					</div>
-					<div class="space-y-1">
-						<p class="text-sm text-muted-foreground">Duration</p>
-						<p class="font-mono">{formatDuration(response.transaction.duration)}</p>
-					</div>
-					<div class="space-y-1">
-						<p class="text-sm text-muted-foreground">Recorded At</p>
-						<p class="font-mono text-sm">
-							{new Date(response.transaction.recordedAt).toLocaleString()}
-						</p>
-					</div>
-					<div class="space-y-1">
-						<p class="text-sm text-muted-foreground">Server</p>
-						<p class="font-mono text-sm">{response.transaction.serverName || '-'}</p>
-					</div>
-					<div class="space-y-1">
-						<p class="text-sm text-muted-foreground">Version</p>
-						<p class="font-mono text-sm">{response.transaction.appVersion || '-'}</p>
-					</div>
-					<div class="space-y-1">
-						<p class="text-sm text-muted-foreground">Client IP</p>
-						<p class="font-mono text-sm">{response.transaction.clientIP || '-'}</p>
-					</div>
-					<div class="space-y-1">
-						<p class="text-sm text-muted-foreground">Body Size</p>
-						<p class="font-mono text-sm">{formatBytes(response.transaction.bodySize)}</p>
-					</div>
+					<LabelValue
+						label="Endpoint"
+						value={decodeURIComponent(data.endpoint)}
+						mono
+						truncate
+					/>
+					<LabelValue
+						label="Status"
+						value={response.transaction.statusCode}
+						mono
+						large
+						valueClass={getStatusColor(response.transaction.statusCode)}
+					/>
+					<LabelValue
+						label="Duration"
+						value={formatDuration(response.transaction.duration)}
+						mono
+						large
+					/>
+					<LabelValue
+						label="Recorded At"
+						value={new Date(response.transaction.recordedAt).toLocaleString()}
+						mono
+					/>
+					<LabelValue
+						label="Server"
+						value={response.transaction.serverName}
+						mono
+					/>
+					<LabelValue
+						label="Version"
+						value={response.transaction.appVersion}
+						mono
+					/>
+					<LabelValue
+						label="Client IP"
+						value={response.transaction.clientIP}
+						mono
+					/>
+					<LabelValue
+						label="Body Size"
+						value={formatBytes(response.transaction.bodySize)}
+						mono
+					/>
 				</div>
 
 				{#if response.transaction.scope && Object.keys(response.transaction.scope).length > 0}

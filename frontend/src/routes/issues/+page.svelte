@@ -11,8 +11,8 @@
 	import { projectsState } from '$lib/state/projects.svelte';
 	import IssueTrendChart from '$lib/components/issue-trend-chart.svelte';
 	import Archive from '@lucide/svelte/icons/archive';
-	import { CircleQuestionMark } from '@lucide/svelte';
-	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { TracewayTableHeader } from '$lib/components/ui/traceway-table-header';
+	import { TableEmptyState } from '$lib/components/ui/table-empty-state';
 
 	type ExceptionTrendPoint = {
 		timestamp: string;
@@ -267,11 +267,7 @@
 				</Table.Body>
 			{:else if exceptions.length === 0}
 				<Table.Body>
-					<Table.Row>
-						<Table.Cell colspan={5} class="h-24 text-center text-muted-foreground">
-							No issues found.
-						</Table.Cell>
-					</Table.Row>
+					<TableEmptyState colspan={5} message="No issues found." />
 				</Table.Body>
 			{:else}
 				<Table.Header>
@@ -283,60 +279,26 @@
 								aria-label="Select all"
 							/>
 						</Table.Head>
-						<Table.Head>
-							<span class="flex items-center gap-1.5">
-								Issue
-								<Tooltip.Root>
-									<Tooltip.Trigger>
-										<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-									</Tooltip.Trigger>
-									<Tooltip.Content>
-										<p class="text-xs">The error message or exception that occurred</p>
-									</Tooltip.Content>
-								</Tooltip.Root>
-							</span>
-						</Table.Head>
-						<Table.Head class="w-[190px]">
-							<span class="flex items-center gap-1.5">
-								Trend
-								<Tooltip.Root>
-									<Tooltip.Trigger>
-										<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-									</Tooltip.Trigger>
-									<Tooltip.Content>
-										<p class="text-xs">Hourly occurrence pattern over the last 24h</p>
-									</Tooltip.Content>
-								</Tooltip.Root>
-							</span>
-						</Table.Head>
-						<Table.Head class="w-[80px] text-right">
-							<span class="flex items-center justify-end gap-1.5">
-								Events
-								<Tooltip.Root>
-									<Tooltip.Trigger>
-										<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-									</Tooltip.Trigger>
-									<Tooltip.Content>
-										<p class="text-xs">
-											Total number of times this issue occurred in the selected range
-										</p>
-									</Tooltip.Content>
-								</Tooltip.Root>
-							</span>
-						</Table.Head>
-						<Table.Head class="w-[180px]">
-							<span class="flex items-center gap-1.5">
-								Last Seen
-								<Tooltip.Root>
-									<Tooltip.Trigger>
-										<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-									</Tooltip.Trigger>
-									<Tooltip.Content>
-										<p class="text-xs">When this issue last occurred</p>
-									</Tooltip.Content>
-								</Tooltip.Root>
-							</span>
-						</Table.Head>
+						<TracewayTableHeader
+							label="Issue"
+							tooltip="The error message or exception that occurred"
+						/>
+						<TracewayTableHeader
+							label="Trend"
+							tooltip="Hourly occurrence pattern over the last 24h"
+							class="w-[190px]"
+						/>
+						<TracewayTableHeader
+							label="Events"
+							tooltip="Total number of times this issue occurred in the selected range"
+							align="right"
+							class="w-[80px]"
+						/>
+						<TracewayTableHeader
+							label="Last Seen"
+							tooltip="When this issue last occurred"
+							class="w-[180px]"
+						/>
 					</Table.Row>
 				</Table.Header>
 				<Table.Body>

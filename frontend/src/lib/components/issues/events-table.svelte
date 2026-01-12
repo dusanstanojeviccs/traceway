@@ -2,8 +2,9 @@
     import { createRowClickHandler } from '$lib/utils/navigation';
     import * as Card from "$lib/components/ui/card";
     import * as Table from "$lib/components/ui/table";
-    import * as Tooltip from "$lib/components/ui/tooltip";
-    import { ArrowRight, CircleQuestionMark } from "lucide-svelte";
+    import { ArrowRight } from "lucide-svelte";
+    import { TracewayTableHeader } from "$lib/components/ui/traceway-table-header";
+    import { TableEmptyState } from "$lib/components/ui/table-empty-state";
     import type { ExceptionOccurrence } from '$lib/types/exceptions';
 
     interface Props {
@@ -44,55 +45,24 @@
                 {#if occurrences.length > 0}
                 <Table.Header>
                     <Table.Row>
-                        <Table.Head>
-                            <span class="flex items-center gap-1.5">
-                                Recorded At
-                                <Tooltip.Root>
-                                    <Tooltip.Trigger>
-                                        <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-                                    </Tooltip.Trigger>
-                                    <Tooltip.Content>
-                                        <p class="text-xs">When this occurrence was recorded</p>
-                                    </Tooltip.Content>
-                                </Tooltip.Root>
-                            </span>
-                        </Table.Head>
-                        <Table.Head>
-                            <span class="flex items-center gap-1.5">
-                                Server
-                                <Tooltip.Root>
-                                    <Tooltip.Trigger>
-                                        <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-                                    </Tooltip.Trigger>
-                                    <Tooltip.Content>
-                                        <p class="text-xs">Server instance where error occurred</p>
-                                    </Tooltip.Content>
-                                </Tooltip.Root>
-                            </span>
-                        </Table.Head>
-                        <Table.Head>
-                            <span class="flex items-center gap-1.5">
-                                Transaction
-                                <Tooltip.Root>
-                                    <Tooltip.Trigger>
-                                        <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-                                    </Tooltip.Trigger>
-                                    <Tooltip.Content>
-                                        <p class="text-xs">Transaction ID if this occurred during a request</p>
-                                    </Tooltip.Content>
-                                </Tooltip.Root>
-                            </span>
-                        </Table.Head>
+                        <TracewayTableHeader
+                            label="Recorded At"
+                            tooltip="When this occurrence was recorded"
+                        />
+                        <TracewayTableHeader
+                            label="Server"
+                            tooltip="Server instance where error occurred"
+                        />
+                        <TracewayTableHeader
+                            label="Transaction"
+                            tooltip="Transaction ID if this occurred during a request"
+                        />
                     </Table.Row>
                 </Table.Header>
                 {/if}
                 <Table.Body>
                     {#if occurrences.length === 0}
-                        <Table.Row>
-                            <Table.Cell colspan={3} class="h-24 text-center">
-                                No occurrences found.
-                            </Table.Cell>
-                        </Table.Row>
+                        <TableEmptyState colspan={3} message="No occurrences found." />
                     {:else}
                         {#each occurrences as occurrence}
                             <Table.Row

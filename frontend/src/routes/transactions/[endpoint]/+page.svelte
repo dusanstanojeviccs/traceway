@@ -4,9 +4,11 @@
     import { api } from '$lib/api';
     import * as Table from "$lib/components/ui/table";
     import { Button } from "$lib/components/ui/button";
-    import { Skeleton } from "$lib/components/ui/skeleton";
+    import { LoadingCircle } from "$lib/components/ui/loading-circle";
     import { TimeRangePicker } from "$lib/components/ui/time-range-picker";
-    import { ArrowLeft, ArrowUpDown, ArrowDown, ArrowUp } from "@lucide/svelte";
+    import { ArrowLeft } from "@lucide/svelte";
+    import { TracewayTableHeader } from "$lib/components/ui/traceway-table-header";
+    import { TableEmptyState } from "$lib/components/ui/table-empty-state";
     import { CalendarDate, getLocalTimeZone, today } from "@internationalized/date";
     import { ErrorDisplay } from "$lib/components/ui/error-display";
     import { projectsState } from '$lib/state/projects.svelte';
@@ -344,13 +346,8 @@
             </div>
         </div>
     {:else if loading}
-        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-            {#each Array(7) as _}
-                <div class="space-y-1">
-                    <Skeleton class="h-8 w-20" />
-                    <Skeleton class="h-3 w-32" />
-                </div>
-            {/each}
+        <div class="flex items-center justify-center py-8">
+            <LoadingCircle size="lg" />
         </div>
     {/if}
 
@@ -360,109 +357,56 @@
             {#if loading || transactions.length > 0}
             <Table.Header>
                 <Table.Row>
-                    <Table.Head class="w-[180px]">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            class="h-8 -ml-3 font-medium"
-                            onclick={() => handleSort('recorded_at')}
-                        >
-                            Recorded At
-                            {#if orderBy === 'recorded_at'}
-                                {#if sortDirection === 'desc'}
-                                    <ArrowDown class="ml-2 h-4 w-4" />
-                                {:else}
-                                    <ArrowUp class="ml-2 h-4 w-4" />
-                                {/if}
-                            {:else}
-                                <ArrowUpDown class="ml-2 h-4 w-4" />
-                            {/if}
-                        </Button>
-                    </Table.Head>
-                    <Table.Head class="w-[120px]">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            class="h-8 -ml-3 font-medium"
-                            onclick={() => handleSort('duration')}
-                        >
-                            Duration
-                            {#if orderBy === 'duration'}
-                                {#if sortDirection === 'desc'}
-                                    <ArrowDown class="ml-2 h-4 w-4" />
-                                {:else}
-                                    <ArrowUp class="ml-2 h-4 w-4" />
-                                {/if}
-                            {:else}
-                                <ArrowUpDown class="ml-2 h-4 w-4" />
-                            {/if}
-                        </Button>
-                    </Table.Head>
-                    <Table.Head class="w-[100px]">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            class="h-8 -ml-3 font-medium"
-                            onclick={() => handleSort('status_code')}
-                        >
-                            Status
-                            {#if orderBy === 'status_code'}
-                                {#if sortDirection === 'desc'}
-                                    <ArrowDown class="ml-2 h-4 w-4" />
-                                {:else}
-                                    <ArrowUp class="ml-2 h-4 w-4" />
-                                {/if}
-                            {:else}
-                                <ArrowUpDown class="ml-2 h-4 w-4" />
-                            {/if}
-                        </Button>
-                    </Table.Head>
-                    <Table.Head class="w-[100px]">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            class="h-8 -ml-3 font-medium"
-                            onclick={() => handleSort('body_size')}
-                        >
-                            Body Size
-                            {#if orderBy === 'body_size'}
-                                {#if sortDirection === 'desc'}
-                                    <ArrowDown class="ml-2 h-4 w-4" />
-                                {:else}
-                                    <ArrowUp class="ml-2 h-4 w-4" />
-                                {/if}
-                            {:else}
-                                <ArrowUpDown class="ml-2 h-4 w-4" />
-                            {/if}
-                        </Button>
-                    </Table.Head>
-                    <Table.Head class="w-[140px]">Client IP</Table.Head>
-                    <Table.Head class="w-[120px]">Server</Table.Head>
-                    <Table.Head class="w-[100px]">Version</Table.Head>
-                    <Table.Head>Context</Table.Head>
+                    <TracewayTableHeader
+                        label="Recorded At"
+                        sortField="recorded_at"
+                        currentSortField={orderBy}
+                        {sortDirection}
+                        onSort={(field) => handleSort(field as SortField)}
+                        class="w-[180px]"
+                    />
+                    <TracewayTableHeader
+                        label="Duration"
+                        sortField="duration"
+                        currentSortField={orderBy}
+                        {sortDirection}
+                        onSort={(field) => handleSort(field as SortField)}
+                        class="w-[120px]"
+                    />
+                    <TracewayTableHeader
+                        label="Status"
+                        sortField="status_code"
+                        currentSortField={orderBy}
+                        {sortDirection}
+                        onSort={(field) => handleSort(field as SortField)}
+                        class="w-[100px]"
+                    />
+                    <TracewayTableHeader
+                        label="Body Size"
+                        sortField="body_size"
+                        currentSortField={orderBy}
+                        {sortDirection}
+                        onSort={(field) => handleSort(field as SortField)}
+                        class="w-[100px]"
+                    />
+                    <TracewayTableHeader label="Client IP" class="w-[140px]" />
+                    <TracewayTableHeader label="Server" class="w-[120px]" />
+                    <TracewayTableHeader label="Version" class="w-[100px]" />
+                    <TracewayTableHeader label="Context" />
                 </Table.Row>
             </Table.Header>
             {/if}
             <Table.Body>
                 {#if loading}
-                    {#each Array(5) as _}
-                        <Table.Row>
-                            <Table.Cell><Skeleton class="h-4 w-[140px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[80px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[50px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[60px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[100px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[100px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[80px]" /></Table.Cell>
-                            <Table.Cell><Skeleton class="h-4 w-[150px]" /></Table.Cell>
-                        </Table.Row>
-                    {/each}
-                {:else if transactions.length === 0}
                     <Table.Row>
-                        <Table.Cell colspan={8} class="h-24 text-center">
-                            No transactions found in this time range.
+                        <Table.Cell colspan={8} class="h-48">
+                            <div class="flex items-center justify-center">
+                                <LoadingCircle size="lg" />
+                            </div>
                         </Table.Cell>
                     </Table.Row>
+                {:else if transactions.length === 0}
+                    <TableEmptyState colspan={8} message="No transactions found in this time range." />
                 {:else}
                     {#each transactions as transaction}
                         <Table.Row

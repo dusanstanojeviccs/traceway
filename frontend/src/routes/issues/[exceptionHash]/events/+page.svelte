@@ -8,11 +8,11 @@
     import * as Card from "$lib/components/ui/card";
     import * as Table from "$lib/components/ui/table";
     import * as Select from "$lib/components/ui/select";
-    import { Skeleton } from "$lib/components/ui/skeleton";
+    import { LoadingCircle } from "$lib/components/ui/loading-circle";
     import { ErrorDisplay } from "$lib/components/ui/error-display";
     import { projectsState } from '$lib/state/projects.svelte';
-    import { CircleQuestionMark } from "lucide-svelte";
-    import * as Tooltip from "$lib/components/ui/tooltip";
+    import { TracewayTableHeader } from "$lib/components/ui/traceway-table-header";
+    import { TableEmptyState } from "$lib/components/ui/table-empty-state";
 
     type ExceptionGroup = {
         exceptionHash: string;
@@ -122,16 +122,9 @@
     </div>
 
     {#if loading && !group}
-        <!-- Loading skeleton -->
-        <Card.Root>
-            <Card.Header>
-                <Skeleton class="h-6 w-48" />
-            </Card.Header>
-            <Card.Content>
-                <Skeleton class="h-4 w-full mb-2" />
-                <Skeleton class="h-4 w-3/4" />
-            </Card.Content>
-        </Card.Root>
+        <div class="flex items-center justify-center py-20">
+            <LoadingCircle size="xlg" />
+        </div>
     {:else if notFound}
         <ErrorDisplay
             status={404}
@@ -168,63 +161,32 @@
                 {#if loading || occurrences.length > 0}
                 <Table.Header>
                     <Table.Row>
-                        <Table.Head>
-                            <span class="flex items-center gap-1.5">
-                                Recorded At
-                                <Tooltip.Root>
-                                    <Tooltip.Trigger>
-                                        <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-                                    </Tooltip.Trigger>
-                                    <Tooltip.Content>
-                                        <p class="text-xs">When this occurrence was recorded</p>
-                                    </Tooltip.Content>
-                                </Tooltip.Root>
-                            </span>
-                        </Table.Head>
-                        <Table.Head>
-                            <span class="flex items-center gap-1.5">
-                                Server
-                                <Tooltip.Root>
-                                    <Tooltip.Trigger>
-                                        <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-                                    </Tooltip.Trigger>
-                                    <Tooltip.Content>
-                                        <p class="text-xs">Server instance where error occurred</p>
-                                    </Tooltip.Content>
-                                </Tooltip.Root>
-                            </span>
-                        </Table.Head>
-                        <Table.Head>
-                            <span class="flex items-center gap-1.5">
-                                Transaction
-                                <Tooltip.Root>
-                                    <Tooltip.Trigger>
-                                        <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-                                    </Tooltip.Trigger>
-                                    <Tooltip.Content>
-                                        <p class="text-xs">Transaction ID if this occurred during a request</p>
-                                    </Tooltip.Content>
-                                </Tooltip.Root>
-                            </span>
-                        </Table.Head>
+                        <TracewayTableHeader
+                            label="Recorded At"
+                            tooltip="When this occurrence was recorded"
+                        />
+                        <TracewayTableHeader
+                            label="Server"
+                            tooltip="Server instance where error occurred"
+                        />
+                        <TracewayTableHeader
+                            label="Transaction"
+                            tooltip="Transaction ID if this occurred during a request"
+                        />
                     </Table.Row>
                 </Table.Header>
                 {/if}
                 <Table.Body>
                     {#if loading}
-                        {#each Array(5) as _}
-                            <Table.Row>
-                                <Table.Cell><Skeleton class="h-4 w-[150px]" /></Table.Cell>
-                                <Table.Cell><Skeleton class="h-4 w-[100px]" /></Table.Cell>
-                                <Table.Cell><Skeleton class="h-4 w-[280px]" /></Table.Cell>
-                            </Table.Row>
-                        {/each}
-                    {:else if occurrences.length === 0}
                         <Table.Row>
-                            <Table.Cell colspan={3} class="h-24 text-center">
-                                No events found.
+                            <Table.Cell colspan={3} class="h-48">
+                                <div class="flex items-center justify-center">
+                                    <LoadingCircle size="lg" />
+                                </div>
                             </Table.Cell>
                         </Table.Row>
+                    {:else if occurrences.length === 0}
+                        <TableEmptyState colspan={3} message="No events found." />
                     {:else}
                         {#each occurrences as occurrence}
                             <Table.Row

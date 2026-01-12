@@ -4,7 +4,9 @@
 	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import * as Table from '$lib/components/ui/table';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { ArrowRight, Info, Gauge, Bug, CircleQuestionMark, TriangleAlert } from 'lucide-svelte';
+	import { ArrowRight, Info, Gauge, Bug, CircleHelp as CircleQuestionMark, TriangleAlert } from 'lucide-svelte';
+	import { TracewayTableHeader } from '$lib/components/ui/traceway-table-header';
+	import { TableEmptyState } from '$lib/components/ui/table-empty-state';
 	import { api } from '$lib/api';
 	import { ErrorDisplay } from '$lib/components/ui/error-display';
 	import { projectsState } from '$lib/state/projects.svelte';
@@ -87,6 +89,7 @@
 	// Calculate impact level based on call volume and response time variance
 	// Returns: 'critical' | 'high' | 'medium' | null (null = not significant)
 	function getImpactLevel(
+		count: number,
 		p50: number,
 		p95: number
 	): 'critical' | 'high' | 'medium' | null {
@@ -152,71 +155,34 @@
 						{#if data?.worstEndpoints && data.worstEndpoints.length > 0}
 							<Table.Header>
 								<Table.Row class="hover:bg-transparent">
-									<Table.Head class="h-10 text-sm">
-										<span class="flex items-center gap-1.5">
-											Endpoint
-											<Tooltip.Root>
-												<Tooltip.Trigger>
-													<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>
-													<p class="text-xs">The API route or page being accessed</p>
-												</Tooltip.Content>
-											</Tooltip.Root>
-										</span>
-									</Table.Head>
-									<Table.Head class="h-10 w-[70px] text-right text-sm">
-										<span class="flex items-center justify-end gap-1.5">
-											Calls
-											<Tooltip.Root>
-												<Tooltip.Trigger>
-													<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>
-													<p class="text-xs">Total number of requests</p>
-												</Tooltip.Content>
-											</Tooltip.Root>
-										</span>
-									</Table.Head>
-									<Table.Head class="h-10 w-[80px] text-right text-sm">
-										<span class="flex items-center justify-end gap-1.5">
-											Typical
-											<Tooltip.Root>
-												<Tooltip.Trigger>
-													<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>
-													<p class="text-xs">Median response time (P50)</p>
-												</Tooltip.Content>
-											</Tooltip.Root>
-										</span>
-									</Table.Head>
-									<Table.Head class="h-10 w-[70px] text-right text-sm">
-										<span class="flex items-center justify-end gap-1.5">
-											Slow
-											<Tooltip.Root>
-												<Tooltip.Trigger>
-													<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>
-													<p class="text-xs">95th percentile - slowest 5%</p>
-												</Tooltip.Content>
-											</Tooltip.Root>
-										</span>
-									</Table.Head>
-									<Table.Head class="h-10 w-[80px] text-right text-sm">
-										<span class="flex items-center justify-end gap-1.5">
-											Impact
-											<Tooltip.Root>
-												<Tooltip.Trigger>
-													<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>
-													<p class="text-xs">Priority based on traffic × variance</p>
-												</Tooltip.Content>
-											</Tooltip.Root>
-										</span>
-									</Table.Head>
+									<TracewayTableHeader
+										label="Endpoint"
+										tooltip="The API route or page being accessed"
+									/>
+									<TracewayTableHeader
+										label="Calls"
+										tooltip="Total number of requests"
+										align="right"
+										class="w-[70px]"
+									/>
+									<TracewayTableHeader
+										label="Typical"
+										tooltip="Median response time (P50)"
+										align="right"
+										class="w-[80px]"
+									/>
+									<TracewayTableHeader
+										label="Slow"
+										tooltip="95th percentile - slowest 5%"
+										align="right"
+										class="w-[70px]"
+									/>
+									<TracewayTableHeader
+										label="Impact"
+										tooltip="Priority based on traffic × variance"
+										align="right"
+										class="w-[80px]"
+									/>
 								</Table.Row>
 							</Table.Header>
 							<Table.Body>
@@ -283,11 +249,7 @@
 							</Table.Body>
 						{:else}
 							<Table.Body>
-								<Table.Row>
-									<Table.Cell colspan={5} class="h-24 text-center text-muted-foreground">
-										No transaction data received yet
-									</Table.Cell>
-								</Table.Row>
+								<TableEmptyState colspan={5} message="No transaction data received yet" />
 							</Table.Body>
 						{/if}
 					</Table.Root>
@@ -315,45 +277,22 @@
 						{#if data?.recentIssues && data.recentIssues.length > 0}
 							<Table.Header>
 								<Table.Row class="hover:bg-transparent">
-									<Table.Head class="h-10 text-sm">
-										<span class="flex items-center gap-1.5">
-											Issue
-											<Tooltip.Root>
-												<Tooltip.Trigger>
-													<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>
-													<p class="text-xs">The error message or exception that occurred</p>
-												</Tooltip.Content>
-											</Tooltip.Root>
-										</span>
-									</Table.Head>
-									<Table.Head class="h-10 w-[70px] text-right text-sm">
-										<span class="flex items-center justify-end gap-1.5">
-											Count
-											<Tooltip.Root>
-												<Tooltip.Trigger>
-													<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>
-													<p class="text-xs">Number of times this issue occurred</p>
-												</Tooltip.Content>
-											</Tooltip.Root>
-										</span>
-									</Table.Head>
-									<Table.Head class="h-10 w-[70px] text-right text-sm">
-										<span class="flex items-center justify-end gap-1.5">
-											When
-											<Tooltip.Root>
-												<Tooltip.Trigger>
-													<CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-												</Tooltip.Trigger>
-												<Tooltip.Content>
-													<p class="text-xs">When this issue last occurred</p>
-												</Tooltip.Content>
-											</Tooltip.Root>
-										</span>
-									</Table.Head>
+									<TracewayTableHeader
+										label="Issue"
+										tooltip="The error message or exception that occurred"
+									/>
+									<TracewayTableHeader
+										label="Count"
+										tooltip="Number of times this issue occurred"
+										align="right"
+										class="w-[70px]"
+									/>
+									<TracewayTableHeader
+										label="When"
+										tooltip="When this issue last occurred"
+										align="right"
+										class="w-[70px]"
+									/>
 								</Table.Row>
 							</Table.Header>
 							<Table.Body>
@@ -384,11 +323,7 @@
 							</Table.Body>
 						{:else}
 							<Table.Body>
-								<Table.Row>
-									<Table.Cell colspan={3} class="h-24 text-center text-muted-foreground">
-										No issues in the last 24 hours
-									</Table.Cell>
-								</Table.Row>
+								<TableEmptyState colspan={3} message="No issues in the last 24 hours" />
 							</Table.Body>
 						{/if}
 					</Table.Root>

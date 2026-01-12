@@ -6,8 +6,9 @@
     import { Button } from "$lib/components/ui/button";
     import { LoadingCircle } from "$lib/components/ui/loading-circle";
     import * as Select from "$lib/components/ui/select";
-    import { ArrowUpDown, ArrowDown, ArrowUp, TriangleAlert, CircleQuestionMark } from "@lucide/svelte";
-    import * as Tooltip from "$lib/components/ui/tooltip";
+    import { TriangleAlert } from "@lucide/svelte";
+    import { TracewayTableHeader } from "$lib/components/ui/traceway-table-header";
+    import { TableEmptyState } from "$lib/components/ui/table-empty-state";
     import { TimeRangePicker } from "$lib/components/ui/time-range-picker";
     import { CalendarDate, getLocalTimeZone, today } from "@internationalized/date";
     import { projectsState } from '$lib/state/projects.svelte';
@@ -347,144 +348,52 @@
             </Table.Body>
             {:else if endpoints.length === 0}
             <Table.Body>
-                <Table.Row>
-                    <Table.Cell colspan={5} class="h-24 text-center text-muted-foreground">
-                        No transaction data received yet
-                    </Table.Cell>
-                </Table.Row>
+                <TableEmptyState colspan={5} message="No transaction data received yet" />
             </Table.Body>
             {:else}
             <Table.Header>
                 <Table.Row>
-                    <Table.Head>
-                        <span class="flex items-center gap-1.5">
-                            Endpoint
-                            <Tooltip.Root>
-                                <Tooltip.Trigger>
-                                    <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-                                </Tooltip.Trigger>
-                                <Tooltip.Content>
-                                    <p class="text-xs">The API route or page being accessed</p>
-                                </Tooltip.Content>
-                            </Tooltip.Root>
-                        </span>
-                    </Table.Head>
-                    <Table.Head class="w-[100px]">
-                        <div class="flex items-center">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                class="h-8 -ml-3 font-medium"
-                                onclick={() => handleSort('count')}
-                            >
-                                Calls
-                                {#if orderBy === 'count'}
-                                    {#if sortDirection === 'desc'}
-                                        <ArrowDown class="ml-2 h-4 w-4" />
-                                    {:else}
-                                        <ArrowUp class="ml-2 h-4 w-4" />
-                                    {/if}
-                                {:else}
-                                    <ArrowUpDown class="ml-2 h-4 w-4" />
-                                {/if}
-                            </Button>
-                            <Tooltip.Root>
-                                <Tooltip.Trigger>
-                                    <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-                                </Tooltip.Trigger>
-                                <Tooltip.Content>
-                                    <p class="text-xs">Total number of requests</p>
-                                </Tooltip.Content>
-                            </Tooltip.Root>
-                        </div>
-                    </Table.Head>
-                    <Table.Head class="w-[100px]">
-                        <div class="flex items-center">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                class="h-8 -ml-3 font-medium"
-                                onclick={() => handleSort('p50_duration')}
-                            >
-                                Typical
-                                {#if orderBy === 'p50_duration'}
-                                    {#if sortDirection === 'desc'}
-                                        <ArrowDown class="ml-2 h-4 w-4" />
-                                    {:else}
-                                        <ArrowUp class="ml-2 h-4 w-4" />
-                                    {/if}
-                                {:else}
-                                    <ArrowUpDown class="ml-2 h-4 w-4" />
-                                {/if}
-                            </Button>
-                            <Tooltip.Root>
-                                <Tooltip.Trigger>
-                                    <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-                                </Tooltip.Trigger>
-                                <Tooltip.Content>
-                                    <p class="text-xs">Median response time (P50)</p>
-                                </Tooltip.Content>
-                            </Tooltip.Root>
-                        </div>
-                    </Table.Head>
-                    <Table.Head class="w-[100px]">
-                        <div class="flex items-center">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                class="h-8 -ml-3 font-medium"
-                                onclick={() => handleSort('p95_duration')}
-                            >
-                                Slow
-                                {#if orderBy === 'p95_duration'}
-                                    {#if sortDirection === 'desc'}
-                                        <ArrowDown class="ml-2 h-4 w-4" />
-                                    {:else}
-                                        <ArrowUp class="ml-2 h-4 w-4" />
-                                    {/if}
-                                {:else}
-                                    <ArrowUpDown class="ml-2 h-4 w-4" />
-                                {/if}
-                            </Button>
-                            <Tooltip.Root>
-                                <Tooltip.Trigger>
-                                    <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-                                </Tooltip.Trigger>
-                                <Tooltip.Content>
-                                    <p class="text-xs">95th percentile - slowest 5% of requests</p>
-                                </Tooltip.Content>
-                            </Tooltip.Root>
-                        </div>
-                    </Table.Head>
-                    <Table.Head class="w-[120px] text-right">
-                        <div class="flex items-center justify-end gap-1.5">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                class="h-8 font-medium"
-                                onclick={() => handleSort('impact')}
-                            >
-                                Impact
-                                {#if orderBy === 'impact'}
-                                    {#if sortDirection === 'desc'}
-                                        <ArrowDown class="ml-2 h-4 w-4" />
-                                    {:else}
-                                        <ArrowUp class="ml-2 h-4 w-4" />
-                                    {/if}
-                                {:else}
-                                    <ArrowUpDown class="ml-2 h-4 w-4" />
-                                {/if}
-                            </Button>
-                            <Tooltip.Root>
-                                <Tooltip.Trigger>
-                                    <CircleQuestionMark class="h-3.5 w-3.5 text-muted-foreground/60" />
-                                </Tooltip.Trigger>
-                                <Tooltip.Content>
-                                    <p class="text-xs">Priority based on traffic × response time variance</p>
-                                </Tooltip.Content>
-                            </Tooltip.Root>
-                        </div>
-                    </Table.Head>
+                    <TracewayTableHeader
+                        label="Endpoint"
+                        tooltip="The API route or page being accessed"
+                    />
+                    <TracewayTableHeader
+                        label="Calls"
+                        tooltip="Total number of requests"
+                        sortField="count"
+                        currentSortField={orderBy}
+                        {sortDirection}
+                        onSort={(field) => handleSort(field as SortField)}
+                        class="w-[100px]"
+                    />
+                    <TracewayTableHeader
+                        label="Typical"
+                        tooltip="Median response time (P50)"
+                        sortField="p50_duration"
+                        currentSortField={orderBy}
+                        {sortDirection}
+                        onSort={(field) => handleSort(field as SortField)}
+                        class="w-[100px]"
+                    />
+                    <TracewayTableHeader
+                        label="Slow"
+                        tooltip="95th percentile - slowest 5% of requests"
+                        sortField="p95_duration"
+                        currentSortField={orderBy}
+                        {sortDirection}
+                        onSort={(field) => handleSort(field as SortField)}
+                        class="w-[100px]"
+                    />
+                    <TracewayTableHeader
+                        label="Impact"
+                        tooltip="Priority based on traffic × response time variance"
+                        sortField="impact"
+                        currentSortField={orderBy}
+                        {sortDirection}
+                        onSort={(field) => handleSort(field as SortField)}
+                        align="right"
+                        class="w-[120px]"
+                    />
                 </Table.Row>
             </Table.Header>
             <Table.Body>

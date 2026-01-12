@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { api } from '$lib/api';
-    import { Skeleton } from "$lib/components/ui/skeleton";
+    import { LoadingCircle } from "$lib/components/ui/loading-circle";
     import { ErrorDisplay } from "$lib/components/ui/error-display";
     import { projectsState } from '$lib/state/projects.svelte';
     import { StackTraceCard, EventCard, EventsTable, PageHeader } from '$lib/components/issues';
@@ -95,10 +95,8 @@
     />
 
     {#if loading && !group}
-        <div class="space-y-4">
-            <Skeleton class="h-48 w-full" />
-            <Skeleton class="h-64 w-full" />
-            <Skeleton class="h-48 w-full" />
+        <div class="flex items-center justify-center py-20">
+            <LoadingCircle size="xlg" />
         </div>
     {:else if notFound}
         <ErrorDisplay

@@ -11,7 +11,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Copy, Check, Eye, EyeOff } from 'lucide-svelte';
 	import { projectsState, type ProjectWithToken, type Framework } from '$lib/state/projects.svelte';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import FrameworkIcon from '$lib/components/framework-icon.svelte';
 	import Highlight from 'svelte-highlight';
 	import go from 'svelte-highlight/languages/go';
@@ -175,12 +175,8 @@ func main() {
 
 	{#if loading}
 		<Card>
-			<CardHeader>
-				<Skeleton class="h-6 w-32" />
-				<Skeleton class="h-4 w-64" />
-			</CardHeader>
-			<CardContent class="space-y-4">
-				<Skeleton class="h-10 w-full" />
+			<CardContent class="flex items-center justify-center py-12">
+				<LoadingCircle size="lg" />
 			</CardContent>
 		</Card>
 	{:else if error}
