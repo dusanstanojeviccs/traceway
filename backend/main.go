@@ -16,7 +16,9 @@ import (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		// we don't actually care for the .env file existing
+		// because in production we can just deploy with container variables
+		log.Println("Error loading .env file")
 	}
 
 	err = chdb.Init()
