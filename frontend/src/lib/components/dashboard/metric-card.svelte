@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from "$lib/components/ui/chart/index.js";
-	import { LineChart, Points } from 'layerchart';
+	import { LineChart, Points, Spline } from 'layerchart';
 	import { scaleUtc } from 'd3-scale';
 	import type { DashboardMetric, MetricTrendPoint, ServerMetricTrend } from '$lib/types/dashboard';
 	import { min, max } from 'd3-array';
@@ -206,6 +206,73 @@
 			color: serverColorMap[server.serverName] || 'var(--chart-1)'
 		}));
 	});
+
+	// Per-server gap detection for multi-server charts
+	const perServerGapData = $derived(() => {
+		if (!hasMultiServerData || !metric.servers) return new Map<string, {
+			gapPoints: Set<number>;
+			isolatedPoints: { timestamp: Date; value: number }[];
+		}>();
+
+		const result = new Map<string, {
+			gapPoints: Set<number>;
+			isolatedPoints: { timestamp: Date; value: number }[];
+		}>();
+
+		for (const server of metric.servers) {
+			const trend = server.trend;
+			if (trend.length < 2) {
+				result.set(server.serverName, {
+					gapPoints: new Set(),
+					isolatedPoints: trend.map((t: MetricTrendPoint) => ({ timestamp: t.timestamp, value: t.value }))
+				});
+				continue;
+			}
+
+			// Calculate threshold for this server (2x median interval)
+			const intervals: number[] = [];
+			for (let i = 1; i < Math.min(trend.length, 10); i++) {
+				intervals.push(trend[i].timestamp.getTime() - trend[i - 1].timestamp.getTime());
+			}
+			intervals.sort((a, b) => a - b);
+			const threshold = intervals[Math.floor(intervals.length / 2)] * 2;
+
+			// Calculate gap points (timestamps where line should break)
+			const serverGapPoints = new Set<number>();
+			for (let i = 1; i < trend.length; i++) {
+				const gap = trend[i].timestamp.getTime() - trend[i - 1].timestamp.getTime();
+				if (gap > threshold) {
+					serverGapPoints.add(trend[i].timestamp.getTime());
+				}
+			}
+
+			// Calculate isolated points (gaps both before AND after)
+			const isolated: { timestamp: Date; value: number }[] = [];
+			for (let i = 0; i < trend.length; i++) {
+				const hasGapBefore = i === 0 ||
+					(trend[i].timestamp.getTime() - trend[i - 1].timestamp.getTime() > threshold);
+				const hasGapAfter = i === trend.length - 1 ||
+					(trend[i + 1].timestamp.getTime() - trend[i].timestamp.getTime() > threshold);
+				if (hasGapBefore && hasGapAfter) {
+					isolated.push({ timestamp: trend[i].timestamp, value: trend[i].value });
+				}
+			}
+
+			result.set(server.serverName, { gapPoints: serverGapPoints, isolatedPoints: isolated });
+		}
+
+		return result;
+	});
+
+	// Helper to get defined function for a specific server
+	function getServerDefined(serverName: string) {
+		return (d: any) => {
+			const gapData = perServerGapData().get(serverName);
+			if (!gapData) return true;
+			const timestamp = d.timestamp instanceof Date ? d.timestamp.getTime() : d.timestamp;
+			return !gapData.gapPoints.has(timestamp);
+		};
+	}
 </script>
 
 <Card.Root class="gap-3 pb-0">
@@ -241,13 +308,15 @@
 				toTime={xDomainValue()?.[1] ?? new Date()}
 				{onRangeSelect}
 				data={metric.trend}
+				servers={metric.servers}
+				{serverColorMap}
 				unit={metric.unit}
 				formatValue={(v) => metric.formatValue ? metric.formatValue(v) : formatMetricValue(v, metric.unit)}
 			>
 				<Chart.Container config={chartConfig()}>
 					{#if hasData()}
 						{#if hasMultiServerData}
-							<!-- Multi-server chart with separate lines per server -->
+							<!-- Multi-server chart with per-server gap handling -->
 							<LineChart
 								data={multiServerChartData()}
 								x="timestamp"
@@ -256,6 +325,9 @@
 								series={multiServerSeries()}
 								yDomain={[Math.max(0, yMin() - padding), yMax() + padding]}
 								seriesLayout="overlap"
+								axis={true}
+								rule={true}
+								grid={{ x: false, y: true }}
 								props={{
 									xAxis: {
 										format: () => ""
@@ -265,7 +337,29 @@
 									}
 								}}
 								tooltip={false}
-							/>
+							>
+								{#snippet spline({ props, seriesIndex })}
+									{@const serverName = multiServerSeries()[seriesIndex]?.key}
+									<Spline {...props} defined={getServerDefined(serverName)} />
+								{/snippet}
+
+								{#snippet aboveMarks()}
+									<!-- Per-server isolated points -->
+									{#each metric.servers ?? [] as server}
+										{@const gapData = perServerGapData().get(server.serverName)}
+										{@const color = serverColorMap[server.serverName] || 'var(--chart-1)'}
+										{#if gapData && gapData.isolatedPoints.length > 0}
+											<Points
+												data={gapData.isolatedPoints}
+												x="timestamp"
+												y="value"
+												r={2}
+												fill={color}
+											/>
+										{/if}
+									{/each}
+								{/snippet}
+							</LineChart>
 						{:else}
 							<!-- Single series chart (original behavior) -->
 							<LineChart
@@ -282,6 +376,9 @@
 								]}
 								yDomain={[Math.max(0, yMin() - padding), yMax() + padding]}
 								seriesLayout="stack"
+								axis={true}
+								rule={true}
+								grid={{ x: false, y: true }}
 								props={{
 									xAxis: {
 										format: () => "",

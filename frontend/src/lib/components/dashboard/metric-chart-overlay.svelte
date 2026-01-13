@@ -8,6 +8,11 @@
 		value: number;
 	};
 
+	type ServerData = {
+		serverName: string;
+		trend: DataPoint[];
+	};
+
 	let {
 		fromTime,
 		toTime,
@@ -15,6 +20,8 @@
 		onRangeSelect,
 		chartPadding = { left: 20, right: 4 },
 		data = [],
+		servers = [],
+		serverColorMap = {},
 		unit = '',
 		formatValue,
 		timezone
@@ -25,10 +32,15 @@
 		onRangeSelect?: (from: Date, to: Date) => void;
 		chartPadding?: { left: number; right: number };
 		data?: DataPoint[];
+		servers?: ServerData[];
+		serverColorMap?: Record<string, string>;
 		unit?: string;
 		formatValue?: (value: number) => string;
 		timezone?: string;
 	}>();
+
+	// Check if we have multi-server data
+	const hasMultiServerData = $derived(servers && servers.length > 1);
 
 	const tz = $derived(timezone ?? getTimezone());
 
@@ -148,11 +160,101 @@
 		return getTimeAtPosition(mouseX);
 	});
 
-	// Calculate the value at the current hover position
+	// Calculate the value at the current hover position (for single-server)
 	const calculatedValue = $derived(() => {
 		const time = calculatedTime();
 		if (!time) return null;
 		return getValueAtTime(time);
+	});
+
+	// Get value at time for a specific server's data
+	function getServerValueAtTime(serverData: DataPoint[], time: Date): { value: number; isInterpolated: boolean } | null {
+		if (serverData.length === 0) return null;
+
+		const targetMs = time.getTime();
+
+		// Calculate threshold for this server
+		let threshold = 3600000;
+		if (serverData.length >= 2) {
+			const intervals: number[] = [];
+			for (let i = 1; i < Math.min(serverData.length, 10); i++) {
+				intervals.push(serverData[i].timestamp.getTime() - serverData[i - 1].timestamp.getTime());
+			}
+			intervals.sort((a, b) => a - b);
+			threshold = intervals[Math.floor(intervals.length / 2)] * 2;
+		}
+
+		// Find the bracketing points
+		let leftIdx = -1;
+		let rightIdx = -1;
+
+		for (let i = 0; i < serverData.length; i++) {
+			const pointMs = serverData[i].timestamp.getTime();
+			if (pointMs <= targetMs) {
+				leftIdx = i;
+			}
+			if (pointMs >= targetMs && rightIdx === -1) {
+				rightIdx = i;
+			}
+		}
+
+		// If exact match
+		if (leftIdx >= 0 && serverData[leftIdx].timestamp.getTime() === targetMs) {
+			return { value: serverData[leftIdx].value, isInterpolated: false };
+		}
+
+		// If we have both bracketing points
+		if (leftIdx >= 0 && rightIdx >= 0 && leftIdx !== rightIdx) {
+			const leftPoint = serverData[leftIdx];
+			const rightPoint = serverData[rightIdx];
+			const gap = rightPoint.timestamp.getTime() - leftPoint.timestamp.getTime();
+
+			if (gap <= threshold) {
+				const t = (targetMs - leftPoint.timestamp.getTime()) / gap;
+				const interpolatedValue = leftPoint.value + t * (rightPoint.value - leftPoint.value);
+				return { value: interpolatedValue, isInterpolated: true };
+			}
+		}
+
+		// Check if we're close to a single point
+		if (leftIdx >= 0) {
+			const leftPoint = serverData[leftIdx];
+			const distToLeft = targetMs - leftPoint.timestamp.getTime();
+			if (distToLeft <= threshold / 2) {
+				return { value: leftPoint.value, isInterpolated: false };
+			}
+		}
+
+		if (rightIdx >= 0) {
+			const rightPoint = serverData[rightIdx];
+			const distToRight = rightPoint.timestamp.getTime() - targetMs;
+			if (distToRight <= threshold / 2) {
+				return { value: rightPoint.value, isInterpolated: false };
+			}
+		}
+
+		return null;
+	}
+
+	// Calculate values for all servers at the current hover position
+	const calculatedServerValues = $derived(() => {
+		const time = calculatedTime();
+		if (!time || !hasMultiServerData) return [];
+
+		const results: { serverName: string; value: number; color: string }[] = [];
+
+		for (const server of servers) {
+			const valueData = getServerValueAtTime(server.trend, time);
+			if (valueData) {
+				results.push({
+					serverName: server.serverName,
+					value: valueData.value,
+					color: serverColorMap[server.serverName] || '#888888'
+				});
+			}
+		}
+
+		return results;
 	});
 
 	// Format value for display
@@ -277,7 +379,28 @@
 		></div>
 
 		<!-- Value tooltip at top -->
-		{#if valueData}
+		{#if hasMultiServerData && calculatedServerValues().length > 0}
+			<!-- Multi-server tooltip -->
+			<div
+				class="absolute top-0 -translate-x-1/2 -translate-y-full pointer-events-none"
+				style="left: {clampedX}px;"
+			>
+				<div
+					class="bg-foreground text-background rounded px-2 py-1 text-xs font-medium whitespace-nowrap shadow-lg mb-1 flex flex-col gap-0.5"
+				>
+					{#each calculatedServerValues() as serverValue}
+						<div class="flex items-center gap-1.5">
+							<span
+								class="h-2 w-2 rounded-full flex-shrink-0"
+								style="background-color: {serverValue.color};"
+							></span>
+							<span>{formatDisplayValue(serverValue.value)}{#if unit}<span class="text-background/70 ml-0.5">{unit}</span>{/if}</span>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{:else if valueData}
+			<!-- Single-server tooltip -->
 			<div
 				class="absolute top-0 -translate-x-1/2 -translate-y-full pointer-events-none"
 				style="left: {clampedX}px;"
