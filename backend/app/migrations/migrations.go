@@ -26,7 +26,9 @@ func runMigrationsClickhouse(connStr string) error {
 		return err
 	}
 
-	driver, err := migrateCh.WithInstance(db, &migrateCh.Config{})
+	driver, err := migrateCh.WithInstance(db, &migrateCh.Config{
+		MigrationsTableEngine: "MergeTree",
+	})
 	if err != nil {
 		return err
 	}
@@ -48,6 +50,12 @@ func Run() error {
 	clickhouseDatabase := os.Getenv("CLICKHOUSE_DATABASE")
 	clickhouseUsername := os.Getenv("CLICKHOUSE_USERNAME")
 	clickhousePassword := os.Getenv("CLICKHOUSE_PASSWORD")
+	clickhouseTls := os.Getenv("CLICKHOUSE_TLS")
 
-	return runMigrationsClickhouse(fmt.Sprintf(`clickhouse://%s?username=%s&password=%s&database=%s`, clickhouseServer, clickhouseUsername, clickhousePassword, clickhouseDatabase))
+	tlsConfig := "&secure=true"
+	if clickhouseTls == "false" {
+		tlsConfig = ""
+	}
+
+	return runMigrationsClickhouse(fmt.Sprintf(`clickhouse://%s?username=%s&password=%s&database=%s%s`, clickhouseServer, clickhouseUsername, clickhousePassword, clickhouseDatabase, tlsConfig))
 }
