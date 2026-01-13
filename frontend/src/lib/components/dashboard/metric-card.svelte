@@ -327,13 +327,19 @@
 								seriesLayout="overlap"
 								axis={true}
 								rule={true}
-								grid={{ x: false, y: true }}
+								grid={{ x: false, y: { style: '--stroke-color: hsl(var(--border));' } }}
 								props={{
 									xAxis: {
-										format: () => ""
+										format: () => "",
+										rule: true
 									},
 									yAxis: {
-										format: (a: number) => a > 999 ? (a/1000).toFixed(0) + "k" : `${a}`,
+										format: (a: number) => {
+											if (a >= 1000000) return (a / 1000000).toFixed(1) + "M";
+											if (a >= 1000) return (a / 1000).toFixed(1) + "k";
+											return Number.isInteger(a) ? a.toString() : a.toFixed(1);
+										},
+										rule: true
 									}
 								}}
 								tooltip={false}
@@ -378,13 +384,19 @@
 								seriesLayout="stack"
 								axis={true}
 								rule={true}
-								grid={{ x: false, y: true }}
+								grid={{ x: false, y: { style: '--stroke-color: hsl(var(--border));' } }}
 								props={{
 									xAxis: {
 										format: () => "",
+										rule: true
 									},
 									yAxis: {
-										format: (a: number) => a > 999 ? (a/1000).toFixed(0) + "k" : `${a}`,
+										format: (a: number) => {
+											if (a >= 1000000) return (a / 1000000).toFixed(1) + "M";
+											if (a >= 1000) return (a / 1000).toFixed(1) + "k";
+											return Number.isInteger(a) ? a.toString() : a.toFixed(1);
+										},
+										rule: true
 									},
 									spline: {
 										defined: isDefined

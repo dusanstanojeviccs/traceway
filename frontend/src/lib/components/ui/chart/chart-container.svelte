@@ -51,10 +51,8 @@
 		// chart.
 		"[&_.lc-axis-tick]:stroke-0",
 
-		// We don't want to display the rule on the x/y axis, as there is already going to be
-		// a grid line there and rule ends up overlapping the marks because it is rendered after
-		// the marks
-		"[&_.lc-rule-x-line:not(.lc-grid-x-rule)]:stroke-0 [&_.lc-rule-y-line:not(.lc-grid-y-rule)]:stroke-0",
+		// Show axis lines (X on bottom, Y on left)
+		"[&_.lc-rule-x-line:not(.lc-grid-x-rule)]:stroke-[#c8cdd4] [&_.lc-rule-y-line:not(.lc-grid-y-rule)]:stroke-[#c8cdd4]",
 		"[&_.lc-grid-x-radial-line]:stroke-border [&_.lc-grid-x-radial-circle]:stroke-border",
 		"[&_.lc-grid-y-radial-line]:stroke-border [&_.lc-grid-y-radial-circle]:stroke-border",
 
