@@ -46,6 +46,10 @@ func main() {
 	apiRouterGroup := router.Group("/api")
 	controllers.RegisterControllers(apiRouterGroup)
 
+	router.GET("/version", func(ctx *gin.Context) {
+		ctx.JSON(200, gin.H{"version": "0.0.1"})
+	})
+
 	if err := router.Run(":8082"); err != nil {
 		panic(err)
 	}
