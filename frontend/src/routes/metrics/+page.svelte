@@ -319,6 +319,7 @@
 					{availableServers}
 					bind:selectedServers
 					onSelectionChange={handleServerSelectionChange}
+					{serverColorMap}
 				/>
 			{/if}
 			<TimeRangePicker

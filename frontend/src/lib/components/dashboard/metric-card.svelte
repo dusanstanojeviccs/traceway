@@ -1,7 +1,6 @@
 <script lang="ts">
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from "$lib/components/ui/chart/index.js";
-	import { TrendingUp, TrendingDown, Minus } from 'lucide-svelte';
 	import { LineChart, Points } from 'layerchart';
 	import { scaleUtc } from 'd3-scale';
 	import type { DashboardMetric, MetricTrendPoint, ServerMetricTrend } from '$lib/types/dashboard';
@@ -20,11 +19,6 @@
 		metric.servers && metric.servers.length > 1
 	);
 
-	const statusColors: Record<string, string> = {
-		healthy: 'bg-green-500',
-		warning: 'bg-yellow-500',
-		critical: 'bg-red-500'
-	};
 
 	// Smart number formatting based on unit type
 	function formatMetricValue(value: number, unit: string): string {
@@ -61,24 +55,6 @@
 		if (Number.isInteger(value)) return value.toString();
 		return value.toFixed(1);
 	}
-
-	const formattedValue = $derived(
-		metric.formatValue
-			? metric.formatValue(metric.value)
-			: formatMetricValue(metric.value, metric.unit)
-	);
-
-	const TrendChangeIcon = $derived(
-		metric.change24h > 0 ? TrendingUp : metric.change24h < 0 ? TrendingDown : Minus
-	);
-
-	const trendChangeColor = $derived(
-		metric.change24h > 0
-			? 'text-green-600 dark:text-green-400'
-			: metric.change24h < 0
-				? 'text-red-600 dark:text-red-400'
-				: 'text-muted-foreground'
-	);
 
 	// Generate chart config based on servers or single value
 	const chartConfig = $derived(() => {
@@ -216,8 +192,8 @@
 		// Convert to sorted array
 		return Array.from(timeMap.values())
 			.map(entry => ({
-				timestamp: new Date(entry.timestamp as unknown as number),
-				...entry
+				...entry,
+				timestamp: new Date(entry.timestamp as unknown as number)
 			}))
 			.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 	});
@@ -233,16 +209,10 @@
 </script>
 
 <Card.Root class="gap-3">
-	<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-0">
+	<Card.Header class="pb-2">
 		<Card.Title class="text-sm font-medium">
 			{metric.name}
 		</Card.Title>
-		<div class="text-2xl font-bold">
-			{formattedValue}{#if metric.unit && metric.unit !== 'MB'}<span class="ml-1 text-lg text-muted-foreground"
-					>{metric.unit}</span
-				>{/if}
-		</div>
-		<!-- <div class={`h-2 w-2 rounded-full ${statusColors[metric.status]}`} title={metric.status}></div> -->
 	</Card.Header>
 	<Card.Content class="pt-0">
 
@@ -346,12 +316,5 @@
 					{/if}
 				</Chart.Container>
 			</MetricChartOverlay>
-
-			<!-- 24h Change -->
-			<div class="flex items-center text-xs {trendChangeColor}">
-				<TrendChangeIcon class="mr-1 h-3 w-3" />
-				<span class="font-medium">{Math.abs(metric.change24h).toFixed(1)}%</span>
-				<span class="ml-1 text-muted-foreground">vs 24h ago</span>
-			</div>
 	</Card.Content>
 </Card.Root>

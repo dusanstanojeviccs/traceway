@@ -1,12 +1,12 @@
 export const SERVER_COLORS = [
-	'var(--chart-1)',
-	'var(--chart-2)',
-	'var(--chart-3)',
-	'var(--chart-4)',
-	'var(--chart-5)',
-	'oklch(0.7 0.15 300)', // Purple
-	'oklch(0.7 0.15 120)', // Green
-	'oklch(0.65 0.2 0)' // Red
+	'#e97a35',  // Orange
+	'#2a9d8f',  // Teal
+	'#4361ee',  // Blue
+	'#d664ba',  // Pink
+	'#e9c46a',  // Yellow
+	'#9b5de5',  // Purple
+	'#57cc99',  // Green
+	'#ef476f'   // Red
 ] as const;
 
 export function getServerColor(serverName: string, allServers: string[]): string {

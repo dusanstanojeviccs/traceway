@@ -3,18 +3,19 @@
 	import * as Popover from '$lib/components/ui/popover';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { Server, ChevronDown } from 'lucide-svelte';
-	import { getServerColor } from '$lib/utils/server-colors';
 
 	interface Props {
 		availableServers: string[];
 		selectedServers: string[];
 		onSelectionChange?: (servers: string[]) => void;
+		serverColorMap: Record<string, string>;
 	}
 
 	let {
 		availableServers,
 		selectedServers = $bindable([]),
-		onSelectionChange
+		onSelectionChange,
+		serverColorMap
 	}: Props = $props();
 
 	let isOpen = $state(false);
@@ -60,12 +61,25 @@
 		tempSelectedServers = new Set();
 	}
 
-	function handleOpenChange(open: boolean) {
-		if (!open) {
-			// Apply selection when closing
-			const newSelection = Array.from(tempSelectedServers);
+	function arraysEqual(a: string[], b: string[]): boolean {
+		if (a.length !== b.length) return false;
+		const sortedA = [...a].sort();
+		const sortedB = [...b].sort();
+		return sortedA.every((v, i) => v === sortedB[i]);
+	}
+
+	function applySelection() {
+		const newSelection = Array.from(tempSelectedServers);
+		if (!arraysEqual(newSelection, selectedServers)) {
 			selectedServers = newSelection;
 			onSelectionChange?.(newSelection);
+		}
+	}
+
+	function handleOpenChange(open: boolean) {
+		if (!open) {
+			// Apply selection when closing (only if changed)
+			applySelection();
 		}
 		isOpen = open;
 	}
@@ -109,8 +123,8 @@
 			</div>
 		</div>
 		<div class="max-h-[280px] overflow-y-auto py-2">
-			{#each availableServers.sort() as serverName}
-				{@const color = getServerColor(serverName, availableServers)}
+			{#each [...availableServers].sort() as serverName}
+				{@const color = serverColorMap[serverName] || '#888888'}
 				<button
 					class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted/50 flex items-center gap-3 transition-colors"
 					onclick={() => toggleServer(serverName)}
@@ -128,7 +142,10 @@
 			{/each}
 		</div>
 		<div class="p-3 border-t">
-			<Button size="sm" class="w-full" onclick={() => isOpen = false}>
+			<Button size="sm" class="w-full" onclick={() => {
+				applySelection();
+				isOpen = false;
+			}}>
 				Apply
 			</Button>
 		</div>
