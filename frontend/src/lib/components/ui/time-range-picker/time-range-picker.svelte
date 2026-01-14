@@ -161,11 +161,21 @@
     let toPickerOpen = $state(false);
 
     // Temporary CalendarDateTime values for custom selection
+    // Parse initial time from props instead of using hardcoded values
+    function parseInitialTime(timeStr: string, fallbackHour: number, fallbackMinute: number): { hour: number; minute: number } {
+        if (!timeStr) return { hour: fallbackHour, minute: fallbackMinute };
+        const [hour, minute] = timeStr.split(':').map(Number);
+        return { hour: hour ?? fallbackHour, minute: minute ?? fallbackMinute };
+    }
+
+    const initialFromTimeParts = parseInitialTime(fromTime, 0, 0);
+    const initialToTimeParts = parseInitialTime(toTime, 23, 59);
+
     let tempFromDateTime = $state<CalendarDateTime>(
-        new CalendarDateTime(fromDate.year, fromDate.month, fromDate.day, 0, 0, 0)
+        new CalendarDateTime(fromDate.year, fromDate.month, fromDate.day, initialFromTimeParts.hour, initialFromTimeParts.minute, 0)
     );
     let tempToDateTime = $state<CalendarDateTime>(
-        new CalendarDateTime(toDate.year, toDate.month, toDate.day, 23, 59, 59)
+        new CalendarDateTime(toDate.year, toDate.month, toDate.day, initialToTimeParts.hour, initialToTimeParts.minute, 59)
     );
 
     // Track initial values when popover opens to detect changes
@@ -268,6 +278,25 @@
         );
     }
 
+    function applyAndClose() {
+        isApplyingInternally = true;
+
+        fromDate = new CalendarDate(tempFromDateTime.year, tempFromDateTime.month, tempFromDateTime.day);
+        toDate = new CalendarDate(tempToDateTime.year, tempToDateTime.month, tempToDateTime.day);
+        fromTime = `${String(tempFromDateTime.hour).padStart(2, '0')}:${String(tempFromDateTime.minute).padStart(2, '0')}`;
+        toTime = `${String(tempToDateTime.hour).padStart(2, '0')}:${String(tempToDateTime.minute).padStart(2, '0')}`;
+
+        const currentPreset = showCustom ? null : selectedPreset;
+        preset = currentPreset;
+        onApply?.({ date: fromDate, time: fromTime }, { date: toDate, time: toTime }, currentPreset);
+
+        setTimeout(() => { isApplyingInternally = false; }, 0);
+
+        fromPickerOpen = false;
+        toPickerOpen = false;
+        isOpen = false;
+    }
+
     function handleOpenChange(open: boolean) {
         if (open) {
             // Capture initial values when opening
@@ -280,30 +309,23 @@
                 tempToDateTime.hour, tempToDateTime.minute, tempToDateTime.second
             );
         } else {
-            // Only apply if values have changed
+            // Skip if already applied by applyAndClose (Apply button was clicked)
+            if (isApplyingInternally) {
+                isOpen = open;
+                return;
+            }
+
+            // Apply if closed by clicking outside and values have changed
             const hasChanged = !initialFromDateTime || !initialToDateTime ||
                 !dateTimesEqual(tempFromDateTime, initialFromDateTime) ||
                 !dateTimesEqual(tempToDateTime, initialToDateTime);
 
             if (hasChanged) {
-                // Set flag to prevent external change detection from triggering
-                isApplyingInternally = true;
-
-                fromDate = new CalendarDate(tempFromDateTime.year, tempFromDateTime.month, tempFromDateTime.day);
-                toDate = new CalendarDate(tempToDateTime.year, tempToDateTime.month, tempToDateTime.day);
-                fromTime = `${String(tempFromDateTime.hour).padStart(2, '0')}:${String(tempFromDateTime.minute).padStart(2, '0')}`;
-                toTime = `${String(tempToDateTime.hour).padStart(2, '0')}:${String(tempToDateTime.minute).padStart(2, '0')}`;
-
-                // Pass current preset (null if custom mode)
-                const currentPreset = showCustom ? null : selectedPreset;
-                preset = currentPreset; // Sync external prop
-                onApply?.({ date: fromDate, time: fromTime }, { date: toDate, time: toTime }, currentPreset);
-
-                // Reset flag after a tick to allow effects to settle
-                setTimeout(() => { isApplyingInternally = false; }, 0);
+                applyAndClose();
+                return; // applyAndClose handles setting isOpen
             }
 
-            // Keep showCustom state (don't reset it) so it remembers custom mode
+            // No changes - just close
             fromPickerOpen = false;
             toPickerOpen = false;
         }
@@ -415,7 +437,7 @@
 
                     <!-- Apply button -->
                     <div class="flex justify-end pt-2">
-                        <Button size="sm" onclick={() => isOpen = false}>
+                        <Button size="sm" onclick={applyAndClose}>
                             Apply
                         </Button>
                     </div>

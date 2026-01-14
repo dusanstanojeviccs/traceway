@@ -234,17 +234,15 @@
 
             <span class="text-sm font-medium text-muted-foreground pb-1">:</span>
 
-            <!-- Seconds -->
+            <!-- Seconds (disabled - not passed between pages) -->
             <div class="flex flex-col items-center gap-1">
                 <span class="text-xs text-muted-foreground">Seconds</span>
                 <input
                     type="text"
                     inputmode="numeric"
-                    class="w-10 h-9 text-center text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring tabular-nums"
+                    class="w-10 h-9 text-center text-sm border rounded-md bg-muted text-muted-foreground tabular-nums cursor-not-allowed"
                     value={String(seconds).padStart(2, '0')}
-                    onchange={handleSecondsInput}
-                    onkeydown={(e) => handleKeyDown(e, 'seconds')}
-                    maxlength={2}
+                    disabled
                 />
             </div>
 
