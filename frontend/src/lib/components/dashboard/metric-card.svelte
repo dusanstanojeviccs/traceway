@@ -278,6 +278,12 @@
 	// Helper to get defined function for a specific server
 	function getServerDefined(serverName: string) {
 		return (d: any) => {
+			// Check if value exists for this server at this point
+			const value = d[serverName];
+			if (value === undefined || value === null || Number.isNaN(value)) {
+				return false;
+			}
+			// Also check gap points
 			const gapData = perServerGapData().get(serverName);
 			if (!gapData) return true;
 			const timestamp = d.timestamp instanceof Date ? d.timestamp.getTime() : d.timestamp;
