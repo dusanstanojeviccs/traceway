@@ -15,8 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"traceway/metrics/cpu"
-	"traceway/metrics/mem"
+	"go.tracewayapp.com/metrics/cpu"
+	"go.tracewayapp.com/metrics/mem"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

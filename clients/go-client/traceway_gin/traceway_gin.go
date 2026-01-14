@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync"
 	"time"
-	"traceway"
+	"go.tracewayapp.com"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

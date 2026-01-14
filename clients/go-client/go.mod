@@ -1,4 +1,4 @@
-module traceway
+module go.tracewayapp.com
 
 go 1.25.1
 
