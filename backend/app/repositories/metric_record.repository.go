@@ -5,12 +5,14 @@ import (
 	"backend/app/models"
 	"context"
 	"time"
+
+	"github.com/ClickHouse/clickhouse-go/v2"
 )
 
 type metricRecordRepository struct{}
 
 func (e *metricRecordRepository) InsertAsync(ctx context.Context, lines []models.MetricRecord) error {
-	batch, err := (*chdb.Conn).PrepareBatch(ctx, "INSERT INTO metric_records (project_id, name, value, recorded_at, server_name)")
+	batch, err := (*chdb.Conn).PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO metric_records (project_id, name, value, recorded_at, server_name)")
 	if err != nil {
 		return err
 	}

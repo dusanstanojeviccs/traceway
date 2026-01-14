@@ -4,10 +4,11 @@ import (
 	"errors"
 	"math/rand/v2"
 	"os"
+	"strconv"
 	"time"
 
-	"go.tracewayapp.com"
-	"go.tracewayapp.com/traceway_gin"
+	traceway "go.tracewayapp.com"
+	tracewaygin "go.tracewayapp.com/traceway_gin"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,6 +29,12 @@ func testGin() {
 		endpoint,
 		traceway.WithDebug(true),
 	))
+
+	router.GET("/test-50k", func(ctx *gin.Context) {
+		for i := range 50_000 {
+			traceway.CaptureMessage("I:" + strconv.Itoa(i))
+		}
+	})
 
 	router.GET("/test-exception", func(ctx *gin.Context) {
 		time.Sleep(time.Duration(rand.IntN(2000)) * time.Millisecond)

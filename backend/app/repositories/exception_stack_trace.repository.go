@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/ClickHouse/clickhouse-go/v2"
 )
 
 var ErrExceptionNotFound = errors.New("exception not found")
@@ -14,13 +16,13 @@ var ErrExceptionNotFound = errors.New("exception not found")
 type exceptionStackTraceRepository struct{}
 
 func (e *exceptionStackTraceRepository) InsertAsync(ctx context.Context, lines []models.ExceptionStackTrace) error {
-	batch, err := (*chdb.Conn).PrepareBatch(ctx, "INSERT INTO exception_stack_traces (project_id, transaction_id, exception_hash, stack_trace, recorded_at, scope, app_version, server_name, is_message)")
+	batch, err := (*chdb.Conn).PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO exception_stack_traces (project_id, transaction_id, exception_hash, stack_trace, recorded_at, scope, app_version, server_name, is_message)")
 	if err != nil {
 		return err
 	}
 	for _, est := range lines {
 		scopeJSON := "{}"
-		if est.Scope != nil {
+		if len(est.Scope) != 0 {
 			if scopeBytes, err := json.Marshal(est.Scope); err == nil {
 				scopeJSON = string(scopeBytes)
 			}

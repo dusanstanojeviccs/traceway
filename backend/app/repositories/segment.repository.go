@@ -4,6 +4,8 @@ import (
 	"backend/app/chdb"
 	"backend/app/models"
 	"context"
+
+	"github.com/ClickHouse/clickhouse-go/v2"
 )
 
 type segmentRepository struct{}
@@ -13,7 +15,7 @@ func (r *segmentRepository) InsertAsync(ctx context.Context, segments []models.S
 		return nil
 	}
 
-	batch, err := (*chdb.Conn).PrepareBatch(ctx,
+	batch, err := (*chdb.Conn).PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)),
 		"INSERT INTO segments (id, transaction_id, project_id, name, start_time, duration, recorded_at)")
 	if err != nil {
 		return err

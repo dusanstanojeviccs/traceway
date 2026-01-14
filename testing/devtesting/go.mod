@@ -42,4 +42,4 @@ require (
 	google.golang.org/protobuf v1.36.9 // indirect
 )
 
-replace go.tracewayapp.com => ../../clients/go-client
+replace go.tracewayapp.com => ../../../go-client

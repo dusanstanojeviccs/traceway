@@ -6,18 +6,20 @@ import (
 	"context"
 	"encoding/json"
 	"time"
+
+	"github.com/ClickHouse/clickhouse-go/v2"
 )
 
 type transactionRepository struct{}
 
 func (e *transactionRepository) InsertAsync(ctx context.Context, lines []models.Transaction) error {
-	batch, err := (*chdb.Conn).PrepareBatch(ctx, "INSERT INTO transactions (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, scope, app_version, server_name)")
+	batch, err := (*chdb.Conn).PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO transactions (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, scope, app_version, server_name)")
 	if err != nil {
 		return err
 	}
 	for _, t := range lines {
 		scopeJSON := "{}"
-		if t.Scope != nil {
+		if len(t.Scope) != 0 {
 			if scopeBytes, err := json.Marshal(t.Scope); err == nil {
 				scopeJSON = string(scopeBytes)
 			}
