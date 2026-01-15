@@ -1,16 +1,34 @@
-// Shared reactive theme state using Svelte 5 runes
-// This module provides a single source of truth for dark mode state
-
 export const themeState = $state({
     isDark: false
 });
 
-// Initialize theme from localStorage or system preference
 export function initTheme() {
     if (typeof document !== 'undefined') {
-        themeState.isDark = document.documentElement.classList.contains('dark');
+        // Check localStorage first
+        const stored = localStorage.getItem('theme');
 
-        // Watch for class changes on documentElement
+        if (stored === 'dark' || stored === 'light') {
+            // Use stored preference
+            themeState.isDark = stored === 'dark';
+        } else {
+            // Fall back to system preference
+            themeState.isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+
+        // Apply the theme
+        document.documentElement.classList.toggle('dark', themeState.isDark);
+
+        // Watch for system preference changes (only matters if no stored preference)
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleSystemChange = (e: MediaQueryListEvent) => {
+            if (!localStorage.getItem('theme')) {
+                themeState.isDark = e.matches;
+                document.documentElement.classList.toggle('dark', themeState.isDark);
+            }
+        };
+        mediaQuery.addEventListener('change', handleSystemChange);
+
+        // Watch for external class changes
         const observer = new MutationObserver(() => {
             themeState.isDark = document.documentElement.classList.contains('dark');
         });
@@ -19,18 +37,15 @@ export function initTheme() {
             attributeFilter: ['class']
         });
 
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+            mediaQuery.removeEventListener('change', handleSystemChange);
+        };
     }
 }
 
-// Toggle theme and persist to localStorage
 export function toggleTheme() {
     themeState.isDark = !themeState.isDark;
-    if (themeState.isDark) {
-        document.documentElement.classList.add('dark');
-        localStorage.setItem('theme', 'dark');
-    } else {
-        document.documentElement.classList.remove('dark');
-        localStorage.setItem('theme', 'light');
-    }
+    document.documentElement.classList.toggle('dark', themeState.isDark);
+    localStorage.setItem('theme', themeState.isDark ? 'dark' : 'light');
 }

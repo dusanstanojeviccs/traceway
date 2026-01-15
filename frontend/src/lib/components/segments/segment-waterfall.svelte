@@ -91,7 +91,7 @@
 			<div class="top-[28px] bottom-0 border-l border-gray-300 absolute pointer-events-none" style="left: {tooltipX+nameColumnWidth}px"></div>
 			<div class="top-[1px] absolute -translate-x-1/2" style="left: {tooltipX+nameColumnWidth}px">
 				<div class="bg-popover text-popover-foreground whitespace-nowrap rounded-md border px-2 py-1 text-xs shadow-md">
-					<div class="font-medium">{Math.round(durationMs*((tooltipX+1)/timelineElement.clientWidth))}ms</div>
+					<div class="font-medium">{Math.round(durationMs*((tooltipX+1)/(timelineElement?.clientWidth||1)))}ms</div>
 				</div>
 			</div>
 		{/if}
