@@ -246,18 +246,6 @@
         loadData(false);
     }
 
-    // Build URL for transaction detail with current time range
-    function getTransactionDetailUrl(transactionId: string): string {
-        const params = new URLSearchParams();
-        if (selectedPreset) {
-            params.set('preset', selectedPreset);
-        } else {
-            params.set('from', getFromDateTimeUTC());
-            params.set('to', getToDateTimeUTC());
-        }
-        return `/transactions/${encodeURIComponent(data.endpoint)}/${transactionId}?${params.toString()}`;
-    }
-
     onMount(() => {
         loadData(false);
     });
@@ -403,7 +391,11 @@
                     {#each transactions as transaction}
                         <Table.Row
                             class="cursor-pointer hover:bg-muted/50"
-                            onclick={createRowClickHandler(getTransactionDetailUrl(transaction.id))}
+                            onclick={createRowClickHandler(
+                                resolve("/transactions/[endpoint]/[transactionId]", {
+                                    endpoint: data.endpoint,
+                                    transactionId: transaction.id,
+                                }))}
                         >
                             <Table.Cell class="text-muted-foreground">
                                 {formatDateTime(transaction.recordedAt, { timezone })}
