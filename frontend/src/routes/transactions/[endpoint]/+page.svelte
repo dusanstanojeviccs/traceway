@@ -272,7 +272,7 @@
                 <ArrowLeft class="h-4 w-4" />
             </Button>
             <div>
-                <h2 class="text-2xl font-bold tracking-tight font-mono">{decodeURIComponent(data.endpoint)}</h2>
+                <h2 class="text-2xl font-bold tracking-tight font-mono break-all">{decodeURIComponent(data.endpoint)}</h2>
                 <p class="text-sm text-muted-foreground">Transaction instances for this endpoint</p>
             </div>
         </div>

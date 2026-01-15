@@ -17,7 +17,7 @@
         <ArrowLeft class="h-4 w-4" />
     </Button>
     <div>
-        <h2 class="font-mono text-2xl font-bold tracking-tight">
+        <h2 class="font-mono text-2xl font-bold tracking-tight break-all">
             {title}
         </h2>
         <p class="text-muted-foreground text-sm">{subtitle}</p>

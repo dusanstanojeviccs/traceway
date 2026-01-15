@@ -90,7 +90,7 @@
 			<ArrowLeft class="h-4 w-4" />
 		</Button>
 		<div>
-			<h2 class="font-mono text-2xl font-bold tracking-tight">
+			<h2 class="font-mono text-2xl font-bold tracking-tight break-all">
 				{decodeURIComponent(data.endpoint)}
 			</h2>
 			<p class="text-sm text-muted-foreground">Transaction ID: {data.transactionId}</p>
