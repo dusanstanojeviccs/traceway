@@ -57,7 +57,7 @@
         {#if occurrence.scope && Object.keys(occurrence.scope).length > 0}
         <hr class="border-border" />
         <div>
-            <p class="text-sm font-medium mb-3">Context</p>
+            <p class="text-sm font-medium mb-3">Context (Scope)</p>
             <ContextGrid scope={occurrence.scope} />
         </div>
         {/if}

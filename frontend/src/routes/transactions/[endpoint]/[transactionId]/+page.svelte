@@ -178,7 +178,7 @@
 				{#if response.transaction.scope && Object.keys(response.transaction.scope).length > 0}
 					<hr class="border-border" />
 					<div>
-						<p class="mb-3 text-sm font-medium">Context</p>
+						<p class="mb-3 text-sm font-medium">Context (Scope)</p>
 						<ContextGrid scope={response.transaction.scope} />
 					</div>
 				{/if}
