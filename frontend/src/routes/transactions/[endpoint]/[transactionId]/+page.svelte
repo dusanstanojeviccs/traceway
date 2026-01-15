@@ -133,7 +133,6 @@
 						label="Endpoint"
 						value={decodeURIComponent(data.endpoint)}
 						mono
-						truncate
 					/>
 					<LabelValue
 						label="Status"

@@ -28,7 +28,7 @@
 		class={cn(
 			!large && "text-sm",
 			mono && "font-mono",
-			truncate && "truncate",
+			truncate ? "truncate" : "break-all",
 			valueClass
 		)}
 		title={truncate && typeof displayValue === 'string' ? displayValue : undefined}

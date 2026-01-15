@@ -7,6 +7,7 @@
     import { formatDuration, getStatusColor, formatDateTime } from '$lib/utils/formatters';
     import { getTimezone } from '$lib/state/timezone.svelte';
     import { ContextGrid } from '$lib/components/ui/context-grid';
+	import { LabelValue } from '../ui/label-value';
 
     interface Props {
         occurrence: ExceptionOccurrence;
@@ -68,22 +69,29 @@
         <div>
             <p class="text-sm font-medium mb-3">Related Transaction</p>
             <div class="grid grid-cols-2 gap-4 md:grid-cols-4 mb-4">
-                <div class="space-y-1">
-                    <p class="text-sm text-muted-foreground">Endpoint</p>
-                    <p class="font-mono text-sm truncate" title={linkedTransaction.endpoint}>{linkedTransaction.endpoint}</p>
-                </div>
-                <div class="space-y-1">
-                    <p class="text-sm text-muted-foreground">Status</p>
-                    <p class="font-mono {getStatusColor(linkedTransaction.statusCode)}">{linkedTransaction.statusCode}</p>
-                </div>
-                <div class="space-y-1">
-                    <p class="text-sm text-muted-foreground">Duration</p>
-                    <p class="font-mono">{formatDuration(linkedTransaction.duration)}</p>
-                </div>
-                <div class="space-y-1">
-                    <p class="text-sm text-muted-foreground">Recorded</p>
-                    <p class="font-mono text-sm">{formatDateTime(linkedTransaction.recordedAt, { timezone: tz })}</p>
-                </div>
+                <LabelValue
+                    label="Endpoint"
+                    value={linkedTransaction.endpoint}
+                    mono
+                />
+                <LabelValue
+                    label="Status"
+                    value={linkedTransaction.statusCode}
+                    mono
+                    large
+                    valueClass={getStatusColor(linkedTransaction.statusCode)}
+                />
+                <LabelValue
+                    label="Duration"
+                    value={formatDuration(linkedTransaction.duration)}
+                    mono
+                    large
+                />
+                <LabelValue
+                    label="Recorded At"
+                    value={formatDateTime(linkedTransaction.recordedAt, { timezone })}
+                    mono
+                />
             </div>
             <Button variant="outline" size="sm" onclick={() => goto(`/transactions/${encodeURIComponent(linkedTransaction.endpoint)}/${linkedTransaction.id}?preset=24h`)}>
                 View Transaction Details
