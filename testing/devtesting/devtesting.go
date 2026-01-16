@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"math/rand/v2"
 	"os"
@@ -27,8 +28,32 @@ func testGin() {
 
 	router.Use(tracewaygin.New(
 		endpoint,
-		traceway.WithDebug(true),
+		tracewaygin.WithDebug(true),
+		tracewaygin.WithRepanic(true),
 	))
+
+	router.GET("/test-task", func(ctx *gin.Context) {
+		go func() {
+			traceway.MeasureTask("traceway data processor", func(twctx context.Context) {
+				seg := traceway.StartSegment(twctx, "loading data")
+				time.Sleep(time.Second * time.Duration(rand.Float64()*2))
+				seg.End()
+
+				for i := range 10 {
+					traceway.CaptureMessageWithContext(ctx, "data loaded successfully "+strconv.Itoa(i))
+				}
+
+				traceway.CaptureExceptionWithContext(twctx, errors.New("what an error"))
+			})
+		}()
+	})
+	router.GET("/test-message", func(ctx *gin.Context) {
+		for i := range 10 {
+			traceway.CaptureMessageWithContext(ctx, "test message "+strconv.Itoa(i))
+		}
+
+		traceway.CaptureExceptionWithContext(ctx, errors.New("test message exception"))
+	})
 
 	router.GET("/test-50k", func(ctx *gin.Context) {
 		for i := range 50_000 {
