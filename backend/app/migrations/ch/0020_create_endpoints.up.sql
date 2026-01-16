@@ -1,15 +1,20 @@
 CREATE TABLE IF NOT EXISTS endpoints (
     id String,
-    project_id String,
-    endpoint String,
+    project_id LowCardinality(String),
+    endpoint LowCardinality(String),
     duration Int64,
     recorded_at DateTime,
-    status_code Int32,
+    status_code Int16,
     body_size Int32,
     client_ip String,
     scope String DEFAULT '{}',
-    app_version String DEFAULT '',
-    server_name String DEFAULT ''
+    app_version LowCardinality(String) DEFAULT '',
+    server_name LowCardinality(String) DEFAULT '',
+
+    INDEX idx_endpoint endpoint TYPE bloom_filter(0.01) GRANULARITY 4,
+    INDEX idx_status_code status_code TYPE set(100) GRANULARITY 4,
+    INDEX idx_id id TYPE bloom_filter(0.001) GRANULARITY 1
 ) ENGINE = MergeTree()
-PARTITION BY toYYYYMM(recorded_at)
-ORDER BY (project_id, recorded_at, endpoint);
+PARTITION BY toYYYYMMDD(recorded_at)
+ORDER BY (project_id, recorded_at, endpoint)
+SETTINGS index_granularity = 8192
