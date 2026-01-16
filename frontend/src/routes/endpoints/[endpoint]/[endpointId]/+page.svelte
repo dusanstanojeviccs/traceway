@@ -10,7 +10,7 @@
 	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import { ErrorDisplay } from '$lib/components/ui/error-display';
 	import { projectsState } from '$lib/state/projects.svelte';
-	import { ArrowLeft, ArrowRight, TriangleAlert, MessageSquare } from 'lucide-svelte';
+	import { ArrowLeft, ArrowRight, TriangleAlert, ClipboardList } from 'lucide-svelte';
 	import { LabelValue } from '$lib/components/ui/label-value';
 	import { ContextGrid } from '$lib/components/ui/context-grid';
 	import SegmentWaterfall from '$lib/components/segments/segment-waterfall.svelte';
@@ -195,23 +195,23 @@
 
 		<!-- Messages Section (if messages exist) -->
 		{#if response.messages.length > 0}
-			<Card.Root class="border-blue-500/30 bg-blue-500/5">
+			<Card.Root>
 				<Card.Header>
 					<div class="flex items-center gap-2">
-						<MessageSquare class="h-5 w-5 text-blue-500" />
-						<Card.Title class="text-blue-600 dark:text-blue-400">Messages</Card.Title>
+						<ClipboardList class="h-5 w-5 text-muted-foreground" />
+						<Card.Title>Messages</Card.Title>
 					</div>
 					<Card.Description>
 						{response.messages.length} message{response.messages.length === 1 ? '' : 's'} logged during this request
 					</Card.Description>
 				</Card.Header>
-				<Card.Content>
+				<Card.Content class="px-0 pb-0">
 					<Table.Root>
 						<Table.Header>
 							<Table.Row>
-								<Table.Head>Message</Table.Head>
+								<Table.Head class="pl-6">Message</Table.Head>
 								<Table.Head class="w-[180px]">Recorded At</Table.Head>
-								<Table.Head class="w-[100px]">Scope</Table.Head>
+								<Table.Head class="w-[100px] pr-6">Scope</Table.Head>
 							</Table.Row>
 						</Table.Header>
 						<Table.Body>
@@ -220,7 +220,7 @@
 									class="cursor-pointer hover:bg-muted/50"
 									onclick={() => goto(`/issues/${message.exceptionHash}/${message.id}`)}
 								>
-									<Table.Cell>
+									<Table.Cell class="pl-6">
 										<div class="max-w-md truncate font-mono text-sm">
 											{message.stackTrace.split('\n')[0]}
 										</div>
@@ -228,7 +228,7 @@
 									<Table.Cell class="font-mono text-sm text-muted-foreground">
 										{formatDateTime(message.recordedAt, { timezone })}
 									</Table.Cell>
-									<Table.Cell>
+									<Table.Cell class="pr-6">
 										{#if message.scope && Object.keys(message.scope).length > 0}
 											<span class="text-xs text-muted-foreground">
 												{Object.keys(message.scope).length} key{Object.keys(message.scope).length === 1 ? '' : 's'}

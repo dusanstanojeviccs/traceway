@@ -66,7 +66,7 @@ func (c *ClientTransaction) ToEndpoint(appVersion, serverName string) models.End
 		Endpoint:   c.Endpoint,
 		Duration:   c.Duration,
 		RecordedAt: c.RecordedAt,
-		StatusCode: int32(c.StatusCode),
+		StatusCode: int16(c.StatusCode),
 		BodySize:   int32(c.BodySize),
 		ClientIP:   c.ClientIP,
 		Scope:      c.Scope,

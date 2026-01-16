@@ -20,11 +20,20 @@ type TaskExceptionInfo struct {
 	RecordedAt    string `json:"recordedAt"`
 }
 
+type TaskMessageInfo struct {
+	Id            string            `json:"id"`
+	ExceptionHash string            `json:"exceptionHash"`
+	StackTrace    string            `json:"stackTrace"`
+	RecordedAt    string            `json:"recordedAt"`
+	Scope         map[string]string `json:"scope,omitempty"`
+}
+
 type TaskDetailResponse struct {
 	Task        *models.Task       `json:"task"`
 	Segments    []models.Segment   `json:"segments"`
 	HasSegments bool               `json:"hasSegments"`
 	Exception   *TaskExceptionInfo `json:"exception,omitempty"`
+	Messages    []TaskMessageInfo  `json:"messages"`
 }
 
 func (c taskDetailController) GetTaskDetail(ctx *gin.Context) {
@@ -53,18 +62,37 @@ func (c taskDetailController) GetTaskDetail(ctx *gin.Context) {
 		panic(err)
 	}
 
-	// Get linked exception if any
+	// Get all linked exceptions and messages
 	var exceptionInfo *TaskExceptionInfo
-	exception, err := repositories.ExceptionStackTraceRepository.FindByTransactionId(ctx, request.ProjectId, taskId)
+	var messages []TaskMessageInfo
+
+	allExceptions, err := repositories.ExceptionStackTraceRepository.FindAllByTransactionId(ctx, request.ProjectId, taskId)
 	if err != nil {
 		panic(err)
 	}
-	if exception != nil {
-		exceptionInfo = &TaskExceptionInfo{
-			ExceptionHash: exception.ExceptionHash,
-			StackTrace:    exception.StackTrace,
-			RecordedAt:    exception.RecordedAt.Format("2006-01-02T15:04:05Z07:00"),
+
+	for _, exc := range allExceptions {
+		if exc.IsMessage {
+			// Add to messages list
+			messages = append(messages, TaskMessageInfo{
+				Id:            exc.Id,
+				ExceptionHash: exc.ExceptionHash,
+				StackTrace:    exc.StackTrace,
+				RecordedAt:    exc.RecordedAt.Format("2006-01-02T15:04:05Z07:00"),
+				Scope:         exc.Scope,
+			})
+		} else if exceptionInfo == nil {
+			// Only take the first actual exception
+			exceptionInfo = &TaskExceptionInfo{
+				ExceptionHash: exc.ExceptionHash,
+				StackTrace:    exc.StackTrace,
+				RecordedAt:    exc.RecordedAt.Format("2006-01-02T15:04:05Z07:00"),
+			}
 		}
+	}
+
+	if messages == nil {
+		messages = []TaskMessageInfo{}
 	}
 
 	ctx.JSON(http.StatusOK, TaskDetailResponse{
@@ -72,6 +100,7 @@ func (c taskDetailController) GetTaskDetail(ctx *gin.Context) {
 		Segments:    segments,
 		HasSegments: len(segments) > 0,
 		Exception:   exceptionInfo,
+		Messages:    messages,
 	})
 }
 

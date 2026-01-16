@@ -40,7 +40,7 @@ func testGin() {
 				seg.End()
 
 				for i := range 10 {
-					traceway.CaptureMessageWithContext(ctx, "data loaded successfully "+strconv.Itoa(i))
+					traceway.CaptureMessageWithContext(twctx, "data loaded successfully "+strconv.Itoa(i))
 				}
 
 				traceway.CaptureExceptionWithContext(twctx, errors.New("what an error"))

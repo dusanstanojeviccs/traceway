@@ -6,10 +6,11 @@
 	import { getTimezone } from '$lib/state/timezone.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
+	import * as Table from '$lib/components/ui/table';
 	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import { ErrorDisplay } from '$lib/components/ui/error-display';
 	import { projectsState } from '$lib/state/projects.svelte';
-	import { ArrowRight, TriangleAlert } from 'lucide-svelte';
+	import { ArrowRight, TriangleAlert, ClipboardList } from 'lucide-svelte';
 	import { LabelValue } from '$lib/components/ui/label-value';
 	import { ContextGrid } from '$lib/components/ui/context-grid';
 	import SegmentWaterfall from '$lib/components/segments/segment-waterfall.svelte';
@@ -33,6 +34,13 @@
 			exceptionHash: string;
 			stackTrace: string;
 		};
+		messages: {
+			id: string;
+			exceptionHash: string;
+			stackTrace: string;
+			recordedAt: string;
+			scope?: Record<string, string>;
+		}[];
 		segments: any[];
 		hasSegments: boolean;
 	};
@@ -140,11 +148,6 @@
 						value={response.task.appVersion}
 						mono
 					/>
-					<LabelValue
-						label="Client IP"
-						value={response.task.clientIP}
-						mono
-					/>
 				</div>
 
 				{#if response.task.scope && Object.keys(response.task.scope).length > 0}
@@ -184,6 +187,58 @@
 						View Full Exception
 						<ArrowRight class="ml-2 h-4 w-4" />
 					</Button>
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
+		<!-- Messages Section (if messages exist) -->
+		{#if response.messages.length > 0}
+			<Card.Root>
+				<Card.Header>
+					<div class="flex items-center gap-2">
+						<ClipboardList class="h-5 w-5 text-muted-foreground" />
+						<Card.Title>Messages</Card.Title>
+					</div>
+					<Card.Description>
+						{response.messages.length} message{response.messages.length === 1 ? '' : 's'} logged during this task
+					</Card.Description>
+				</Card.Header>
+				<Card.Content class="px-0 pb-0">
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.Head class="pl-6">Message</Table.Head>
+								<Table.Head class="w-[180px]">Recorded At</Table.Head>
+								<Table.Head class="w-[100px] pr-6">Scope</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each response.messages as message}
+								<Table.Row
+									class="cursor-pointer hover:bg-muted/50"
+									onclick={() => goto(`/issues/${message.exceptionHash}/${message.id}`)}
+								>
+									<Table.Cell class="pl-6">
+										<div class="max-w-md truncate font-mono text-sm">
+											{message.stackTrace.split('\n')[0]}
+										</div>
+									</Table.Cell>
+									<Table.Cell class="font-mono text-sm text-muted-foreground">
+										{formatDateTime(message.recordedAt, { timezone })}
+									</Table.Cell>
+									<Table.Cell class="pr-6">
+										{#if message.scope && Object.keys(message.scope).length > 0}
+											<span class="text-xs text-muted-foreground">
+												{Object.keys(message.scope).length} key{Object.keys(message.scope).length === 1 ? '' : 's'}
+											</span>
+										{:else}
+											<span class="text-xs text-muted-foreground">-</span>
+										{/if}
+									</Table.Cell>
+								</Table.Row>
+							{/each}
+						</Table.Body>
+					</Table.Root>
 				</Card.Content>
 			</Card.Root>
 		{/if}

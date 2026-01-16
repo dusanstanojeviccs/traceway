@@ -67,13 +67,18 @@
             if (occurrence.transactionId) {
                 try {
                     const isTask = occurrence.transactionType === 'task';
+                    console.log('DEBUG linked transaction:', {
+                        transactionId: occurrence.transactionId,
+                        transactionType: occurrence.transactionType,
+                        isTask
+                    });
                     const endpoint = isTask ? '/tasks' : '/endpoints';
                     const txResponse = await api.post(
                         `${endpoint}/${occurrence.transactionId}`,
                         {},
                         { projectId: projectsState.currentProjectId ?? undefined }
                     );
-                    const txData = isTask ? txResponse.task : txResponse.transaction;
+                    const txData = isTask ? txResponse.task : txResponse.endpoint;
                     if (txData) {
                         linkedTransaction = {
                             id: txData.id,
@@ -85,7 +90,11 @@
                         };
                     }
                 } catch (txError) {
-                    console.warn('Could not load linked transaction:', txError);
+                    console.error('Failed to load linked transaction:', {
+                        error: txError,
+                        transactionId: occurrence.transactionId,
+                        transactionType: occurrence.transactionType
+                    });
                 }
             }
         } catch (e: any) {
