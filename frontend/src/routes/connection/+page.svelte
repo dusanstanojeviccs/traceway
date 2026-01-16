@@ -61,11 +61,10 @@
 	}
 
 	// Framework-specific code snippets
-	function getFrameworkCode(framework: Framework, token: string): string {
-		const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8082';
+	function getFrameworkCode(framework: Framework, token: string, backendUrl: string): string {
 		const connectionString = token
-			? `${token}@${apiUrl}/api/report`
-			: `YOUR_TOKEN@${apiUrl}/api/report`;
+			? `${token}@${backendUrl}/api/report`
+			: `YOUR_TOKEN@${backendUrl}/api/report`;
 
 		switch (framework) {
 			case 'gin':
@@ -145,7 +144,9 @@ func main() {
 	}
 
 	const sdkCode = $derived(
-		projectWithToken ? getFrameworkCode(projectWithToken.framework, projectWithToken.token) : ''
+		projectWithToken
+			? getFrameworkCode(projectWithToken.framework, projectWithToken.token, projectWithToken.backendUrl)
+			: ''
 	);
 
 	const installCommand = $derived(

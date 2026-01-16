@@ -7,6 +7,7 @@ export interface Project {
     name: string;
     framework: Framework;
     createdAt: string;
+    backendUrl: string;
 }
 
 export interface ProjectWithToken extends Project {

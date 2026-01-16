@@ -1,10 +1,19 @@
 package models
 
 import (
+	"os"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// getBackendUrl returns the BACKEND_URL env var or default
+func getBackendUrl() string {
+	if url := os.Getenv("BACKEND_URL"); url != "" {
+		return url
+	}
+	return "https://tracewayapp.com"
+}
 
 type Project struct {
 	Id        uuid.UUID `json:"id" ch:"id"`
@@ -16,38 +25,42 @@ type Project struct {
 
 // ProjectResponse omits the token for security in listing endpoints
 type ProjectResponse struct {
-	Id        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Framework string    `json:"framework"`
-	CreatedAt time.Time `json:"createdAt"`
+	Id         uuid.UUID `json:"id"`
+	Name       string    `json:"name"`
+	Framework  string    `json:"framework"`
+	CreatedAt  time.Time `json:"createdAt"`
+	BackendUrl string    `json:"backendUrl"`
 }
 
 // ProjectWithToken includes token - used when creating or viewing connection details
 type ProjectWithToken struct {
-	Id        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Token     string    `json:"token"`
-	Framework string    `json:"framework"`
-	CreatedAt time.Time `json:"createdAt"`
+	Id         uuid.UUID `json:"id"`
+	Name       string    `json:"name"`
+	Token      string    `json:"token"`
+	Framework  string    `json:"framework"`
+	CreatedAt  time.Time `json:"createdAt"`
+	BackendUrl string    `json:"backendUrl"`
 }
 
 // ToResponse converts a Project to ProjectResponse (without token)
 func (p *Project) ToResponse() ProjectResponse {
 	return ProjectResponse{
-		Id:        p.Id,
-		Name:      p.Name,
-		Framework: p.Framework,
-		CreatedAt: p.CreatedAt,
+		Id:         p.Id,
+		Name:       p.Name,
+		Framework:  p.Framework,
+		CreatedAt:  p.CreatedAt,
+		BackendUrl: getBackendUrl(),
 	}
 }
 
 // ToWithToken converts a Project to ProjectWithToken
 func (p *Project) ToWithToken() ProjectWithToken {
 	return ProjectWithToken{
-		Id:        p.Id,
-		Name:      p.Name,
-		Token:     p.Token,
-		Framework: p.Framework,
-		CreatedAt: p.CreatedAt,
+		Id:         p.Id,
+		Name:       p.Name,
+		Token:      p.Token,
+		Framework:  p.Framework,
+		CreatedAt:  p.CreatedAt,
+		BackendUrl: getBackendUrl(),
 	}
 }

@@ -1,6 +1,7 @@
 # ==============================================================================
-# Traceway All-in-One Docker Image
-# Includes: Frontend (SvelteKit), Backend (Go), ClickHouse
+# Traceway Standalone Docker Image
+# Single binary serving both API and Frontend (no ClickHouse included)
+# Uses systemd for process management with watchdog support
 # ==============================================================================
 
 # ==============================================================================
@@ -19,13 +20,10 @@ RUN npm ci
 # Copy source and build
 COPY frontend/ ./
 
-# Set the API URL for the frontend build (baked in at build time)
-ENV VITE_API_URL=https://tracewayapp.com
-
 RUN npm run build
 
 # ==============================================================================
-# Stage 2: Build Backend
+# Stage 2: Build Backend with embedded frontend
 # ==============================================================================
 FROM golang:1.24-alpine AS backend-builder
 
@@ -37,80 +35,94 @@ RUN apk add --no-cache git
 # Copy all backend source
 COPY backend/ ./
 
-# Fix go version (1.25.1 doesn't exist yet, use 1.24) and download deps
+# Copy built frontend to static/dist for embedding
+COPY --from=frontend-builder /app/frontend/build ./static/dist/
+
+# Fix go version and download deps
 RUN go mod edit -go=1.24 && go mod download
 
-# Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /traceway-backend .
+# Build with embedded static files
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /traceway .
 
 # ==============================================================================
-# Stage 3: Extract ClickHouse binaries
-# ==============================================================================
-FROM clickhouse/clickhouse-server:24.8-alpine AS clickhouse-source
-
-# ==============================================================================
-# Stage 4: Final Runtime Image
+# Stage 3: Final runtime image with systemd
 # ==============================================================================
 FROM debian:bookworm-slim
 
-# Install runtime dependencies
+# Install systemd and minimal dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    nginx \
-    supervisor \
+    systemd \
+    systemd-sysv \
     ca-certificates \
     curl \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /var/log/supervisor \
-    && mkdir -p /var/log/nginx \
-    && mkdir -p /var/lib/clickhouse \
-    && mkdir -p /var/log/clickhouse-server \
-    && mkdir -p /etc/clickhouse-server/config.d \
-    && mkdir -p /etc/clickhouse-server/users.d
+    # Remove unnecessary systemd services
+    && rm -f /lib/systemd/system/multi-user.target.wants/* \
+    && rm -f /etc/systemd/system/*.wants/* \
+    && rm -f /lib/systemd/system/local-fs.target.wants/* \
+    && rm -f /lib/systemd/system/sockets.target.wants/*udev* \
+    && rm -f /lib/systemd/system/sockets.target.wants/*initctl* \
+    && rm -f /lib/systemd/system/basic.target.wants/* \
+    && rm -f /lib/systemd/system/anaconda.target.wants/*
 
-# Copy ClickHouse binaries and configs from official image
-COPY --from=clickhouse-source /usr/bin/clickhouse /usr/bin/clickhouse
-COPY --from=clickhouse-source /etc/clickhouse-server/config.xml /etc/clickhouse-server/config.xml
-COPY --from=clickhouse-source /etc/clickhouse-server/users.xml /etc/clickhouse-server/users.xml
+# Copy the binary
+COPY --from=backend-builder /traceway /usr/local/bin/traceway
 
-# Create ClickHouse symlinks (clickhouse is a multicall binary)
-RUN ln -s /usr/bin/clickhouse /usr/bin/clickhouse-server \
-    && ln -s /usr/bin/clickhouse /usr/bin/clickhouse-client
+# Create app directory
+RUN mkdir -p /app
 
-# Copy built frontend
-COPY --from=frontend-builder /app/frontend/build /var/www/html
+# Create systemd service file for traceway
+RUN cat > /etc/systemd/system/traceway.service << 'EOF'
+[Unit]
+Description=Traceway Error Tracking Server
+After=network.target
 
-# Copy built backend
-COPY --from=backend-builder /traceway-backend /usr/local/bin/traceway-backend
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/traceway
+WorkingDirectory=/app
+Restart=always
+RestartSec=5
 
-# Copy configuration files
-COPY docker/nginx.conf /etc/nginx/nginx.conf
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY docker/clickhouse-config.xml /etc/clickhouse-server/config.d/docker.xml
-COPY docker/clickhouse-users.xml /etc/clickhouse-server/users.d/docker.xml
-COPY docker/wait-for-clickhouse.sh /usr/local/bin/wait-for-clickhouse.sh
-COPY docker/start-backend.sh /usr/local/bin/start-backend.sh
+# Environment variables
+Environment=ENABLE_PORT_80=true
+Environment=GIN_MODE=release
 
-# Make scripts executable
-RUN chmod +x /usr/local/bin/wait-for-clickhouse.sh \
-    && chmod +x /usr/local/bin/start-backend.sh
+# Watchdog - service must notify within 30s or it will be restarted
+WatchdogSec=30
 
-# Create clickhouse user and set permissions
-RUN useradd -r -s /bin/false clickhouse \
-    && chown -R clickhouse:clickhouse /var/lib/clickhouse \
-    && chown -R clickhouse:clickhouse /var/log/clickhouse-server
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/app
 
-# Create app directory for backend and copy env file
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=traceway
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable the service
+RUN systemctl enable traceway.service
+
+# Set working directory
 WORKDIR /app
-COPY backend/.env.docker /app/.env
+
+# Environment variables (can be overridden at runtime)
+ENV ENABLE_PORT_80=true
+ENV GIN_MODE=release
 
 # Expose ports
-# Port 80: nginx (frontend + API proxy)
-# Port 8082: direct backend access (optional)
 EXPOSE 80 8082
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://localhost/health || exit 1
 
-# Start supervisord
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Use systemd as init
+STOPSIGNAL SIGRTMIN+3
+CMD ["/lib/systemd/systemd"]
