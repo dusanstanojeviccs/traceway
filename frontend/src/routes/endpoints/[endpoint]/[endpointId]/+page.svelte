@@ -6,10 +6,11 @@
 	import { getTimezone } from '$lib/state/timezone.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
+	import * as Table from '$lib/components/ui/table';
 	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import { ErrorDisplay } from '$lib/components/ui/error-display';
 	import { projectsState } from '$lib/state/projects.svelte';
-	import { ArrowLeft, ArrowRight, TriangleAlert } from 'lucide-svelte';
+	import { ArrowLeft, ArrowRight, TriangleAlert, MessageSquare } from 'lucide-svelte';
 	import { LabelValue } from '$lib/components/ui/label-value';
 	import { ContextGrid } from '$lib/components/ui/context-grid';
 	import SegmentWaterfall from '$lib/components/segments/segment-waterfall.svelte';
@@ -113,49 +114,49 @@
 					/>
 					<LabelValue
 						label="Status"
-						value={response.transaction.statusCode}
+						value={response.endpoint.statusCode}
 						mono
 						large
-						valueClass={getStatusColor(response.transaction.statusCode)}
+						valueClass={getStatusColor(response.endpoint.statusCode)}
 					/>
 					<LabelValue
 						label="Duration"
-						value={formatDuration(response.transaction.duration)}
+						value={formatDuration(response.endpoint.duration)}
 						mono
 						large
 					/>
 					<LabelValue
 						label="Recorded At"
-						value={formatDateTime(response.transaction.recordedAt, { timezone })}
+						value={formatDateTime(response.endpoint.recordedAt, { timezone })}
 						mono
 					/>
 					<LabelValue
 						label="Server"
-						value={response.transaction.serverName}
+						value={response.endpoint.serverName}
 						mono
 					/>
 					<LabelValue
 						label="Version"
-						value={response.transaction.appVersion}
+						value={response.endpoint.appVersion}
 						mono
 					/>
 					<LabelValue
 						label="Client IP"
-						value={response.transaction.clientIP}
+						value={response.endpoint.clientIP}
 						mono
 					/>
 					<LabelValue
 						label="Body Size"
-						value={formatBytes(response.transaction.bodySize)}
+						value={formatBytes(response.endpoint.bodySize)}
 						mono
 					/>
 				</div>
 
-				{#if response.transaction.scope && Object.keys(response.transaction.scope).length > 0}
+				{#if response.endpoint.scope && Object.keys(response.endpoint.scope).length > 0}
 					<hr class="border-border" />
 					<div>
 						<p class="mb-3 text-sm font-medium">Context (Scope)</p>
-						<ContextGrid scope={response.transaction.scope} />
+						<ContextGrid scope={response.endpoint.scope} />
 					</div>
 				{/if}
 			</Card.Content>
@@ -192,6 +193,58 @@
 			</Card.Root>
 		{/if}
 
+		<!-- Messages Section (if messages exist) -->
+		{#if response.messages.length > 0}
+			<Card.Root class="border-blue-500/30 bg-blue-500/5">
+				<Card.Header>
+					<div class="flex items-center gap-2">
+						<MessageSquare class="h-5 w-5 text-blue-500" />
+						<Card.Title class="text-blue-600 dark:text-blue-400">Messages</Card.Title>
+					</div>
+					<Card.Description>
+						{response.messages.length} message{response.messages.length === 1 ? '' : 's'} logged during this request
+					</Card.Description>
+				</Card.Header>
+				<Card.Content>
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.Head>Message</Table.Head>
+								<Table.Head class="w-[180px]">Recorded At</Table.Head>
+								<Table.Head class="w-[100px]">Scope</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each response.messages as message}
+								<Table.Row
+									class="cursor-pointer hover:bg-muted/50"
+									onclick={() => goto(`/issues/${message.exceptionHash}/${message.id}`)}
+								>
+									<Table.Cell>
+										<div class="max-w-md truncate font-mono text-sm">
+											{message.stackTrace.split('\n')[0]}
+										</div>
+									</Table.Cell>
+									<Table.Cell class="font-mono text-sm text-muted-foreground">
+										{formatDateTime(message.recordedAt, { timezone })}
+									</Table.Cell>
+									<Table.Cell>
+										{#if message.scope && Object.keys(message.scope).length > 0}
+											<span class="text-xs text-muted-foreground">
+												{Object.keys(message.scope).length} key{Object.keys(message.scope).length === 1 ? '' : 's'}
+											</span>
+										{:else}
+											<span class="text-xs text-muted-foreground">-</span>
+										{/if}
+									</Table.Cell>
+								</Table.Row>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
 		<!-- Segments Section -->
 		<Card.Root>
 			<Card.Header>
@@ -208,8 +261,8 @@
 				{#if response.hasSegments}
 					<SegmentWaterfall
 						segments={response.segments}
-						transactionDuration={response.transaction.duration}
-						transactionStartTime={response.transaction.recordedAt}
+						transactionDuration={response.endpoint.duration}
+						transactionStartTime={response.endpoint.recordedAt}
 					/>
 				{:else}
 					<SegmentEmptyState framework={projectsState.currentProject?.framework ?? 'gin'} />

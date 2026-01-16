@@ -28,9 +28,18 @@ export type ExceptionInfo = {
 	recordedAt: string;
 };
 
+export type MessageInfo = {
+	id: string;
+	exceptionHash: string;
+	stackTrace: string;
+	recordedAt: string;
+	scope?: Record<string, string>;
+};
+
 export type TransactionDetailResponse = {
-	transaction: TransactionDetail;
+	endpoint: TransactionDetail;
 	segments: Segment[];
 	hasSegments: boolean;
 	exception?: ExceptionInfo;
+	messages: MessageInfo[];
 };

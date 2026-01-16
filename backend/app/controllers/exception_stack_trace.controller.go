@@ -19,6 +19,7 @@ type ExceptionSearchRequest struct {
 	OrderBy         string           `json:"orderBy"`
 	Pagination      PaginationParams `json:"pagination"`
 	Search          string           `json:"search"`
+	SearchType      string           `json:"searchType"`
 	IncludeArchived bool             `json:"includeArchived"`
 }
 
@@ -45,7 +46,7 @@ func (e exceptionStackTraceController) FindGrouppedExceptionStackTraces(c *gin.C
 		return
 	}
 
-	exceptions, total, err := repositories.ExceptionStackTraceRepository.FindGrouped(c, request.ProjectId, request.FromDate, request.ToDate, request.Pagination.Page, request.Pagination.PageSize, request.OrderBy, request.Search, request.IncludeArchived)
+	exceptions, total, err := repositories.ExceptionStackTraceRepository.FindGrouped(c, request.ProjectId, request.FromDate, request.ToDate, request.Pagination.Page, request.Pagination.PageSize, request.OrderBy, request.Search, request.SearchType, request.IncludeArchived)
 	if err != nil {
 		panic(err)
 	}
@@ -159,6 +160,33 @@ func (e exceptionStackTraceController) UnarchiveExceptions(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"unarchived": len(request.Hashes)})
+}
+
+func (e exceptionStackTraceController) FindById(c *gin.Context) {
+	exceptionId := c.Param("exceptionId")
+	if exceptionId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "exception id is required"})
+		return
+	}
+
+	var request struct {
+		ProjectId string `json:"projectId"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	exception, err := repositories.ExceptionStackTraceRepository.FindById(c, request.ProjectId, exceptionId)
+	if err != nil {
+		if errors.Is(err, repositories.ErrExceptionNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Exception not found"})
+			return
+		}
+		panic(err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"exception": exception})
 }
 
 var ExceptionStackTraceController = exceptionStackTraceController{}

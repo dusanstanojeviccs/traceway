@@ -32,7 +32,7 @@
         toDate = $bindable(today(getLocalTimeZone())),
         fromTime = $bindable('00:00'),
         toTime = $bindable('23:59'),
-        preset = $bindable<string | null>('6h'),
+        preset = $bindable<string | null>('24h'),
         timezone,
         onApply
     }: Props = $props();

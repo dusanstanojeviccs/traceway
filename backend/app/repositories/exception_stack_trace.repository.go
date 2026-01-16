@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -16,7 +17,7 @@ var ErrExceptionNotFound = errors.New("exception not found")
 type exceptionStackTraceRepository struct{}
 
 func (e *exceptionStackTraceRepository) InsertAsync(ctx context.Context, lines []models.ExceptionStackTrace) error {
-	batch, err := (*chdb.Conn).PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO exception_stack_traces (project_id, transaction_id, transaction_type, exception_hash, stack_trace, recorded_at, scope, app_version, server_name, is_message)")
+	batch, err := (*chdb.Conn).PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO exception_stack_traces (id, project_id, transaction_id, transaction_type, exception_hash, stack_trace, recorded_at, scope, app_version, server_name, is_message)")
 	if err != nil {
 		return err
 	}
@@ -35,7 +36,7 @@ func (e *exceptionStackTraceRepository) InsertAsync(ctx context.Context, lines [
 		if transactionType == "" {
 			transactionType = "endpoint"
 		}
-		if err := batch.Append(est.ProjectId, est.TransactionId, transactionType, est.ExceptionHash, est.StackTrace, est.RecordedAt, scopeJSON, est.AppVersion, est.ServerName, isMessage); err != nil {
+		if err := batch.Append(est.Id, est.ProjectId, est.TransactionId, transactionType, est.ExceptionHash, est.StackTrace, est.RecordedAt, scopeJSON, est.AppVersion, est.ServerName, isMessage); err != nil {
 			return err
 		}
 	}
@@ -48,8 +49,15 @@ func (e *exceptionStackTraceRepository) CountBetween(ctx context.Context, projec
 	return int64(count), err
 }
 
-func (e *exceptionStackTraceRepository) FindGrouped(ctx context.Context, projectId string, fromDate, toDate time.Time, page, pageSize int, orderBy string, search string, includeArchived bool) ([]models.ExceptionGroup, int64, error) {
+func (e *exceptionStackTraceRepository) FindGrouped(ctx context.Context, projectId string, fromDate, toDate time.Time, page, pageSize int, orderBy string, search string, searchType string, includeArchived bool) ([]models.ExceptionGroup, int64, error) {
 	offset := (page - 1) * pageSize
+
+	// Parse sort direction from orderBy (e.g., "last_seen_asc" -> "last_seen", "ASC")
+	sortDirection := "DESC"
+	if strings.HasSuffix(orderBy, "_asc") {
+		orderBy = strings.TrimSuffix(orderBy, "_asc")
+		sortDirection = "ASC"
+	}
 
 	allowedOrderBy := map[string]bool{
 		"last_seen":  true,
@@ -69,6 +77,14 @@ func (e *exceptionStackTraceRepository) FindGrouped(ctx context.Context, project
 		whereClause += " AND positionCaseInsensitive(e.stack_trace, ?) > 0"
 		args = append(args, search)
 	}
+
+	// Add searchType filter
+	if searchType == "issues" {
+		whereClause += " AND e.is_message = 0"
+	} else if searchType == "messages" {
+		whereClause += " AND e.is_message = 1"
+	}
+	// "all" or empty = no filter
 
 	// Build HAVING clause for archive filtering
 	// Show exceptions if: not archived OR last occurrence is after archive time
@@ -107,7 +123,7 @@ func (e *exceptionStackTraceRepository) FindGrouped(ctx context.Context, project
 		` + archiveSubquery + `
 		WHERE ` + whereClause + `
 		GROUP BY e.exception_hash` + havingClause + `
-		ORDER BY ` + orderBy + ` DESC LIMIT ? OFFSET ?`
+		ORDER BY ` + orderBy + ` ` + sortDirection + ` LIMIT ? OFFSET ?`
 
 	queryArgs := append([]interface{}{projectId}, args...)
 	queryArgs = append(queryArgs, pageSize, offset)
@@ -144,7 +160,7 @@ func (e *exceptionStackTraceRepository) FindByHash(ctx context.Context, projectI
 
 	// Get individual occurrences with pagination (including scope)
 	rows, err := (*chdb.Conn).Query(ctx,
-		"SELECT project_id, transaction_id, transaction_type, exception_hash, stack_trace, recorded_at, scope, app_version, server_name, is_message FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ? ORDER BY recorded_at DESC LIMIT ? OFFSET ?",
+		"SELECT id, project_id, transaction_id, transaction_type, exception_hash, stack_trace, recorded_at, scope, app_version, server_name, is_message FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ? ORDER BY recorded_at DESC LIMIT ? OFFSET ?",
 		projectId, exceptionHash, pageSize, offset)
 	if err != nil {
 		return nil, nil, 0, err
@@ -156,7 +172,7 @@ func (e *exceptionStackTraceRepository) FindByHash(ctx context.Context, projectI
 		var o models.ExceptionStackTrace
 		var scopeJSON string
 		var isMessage uint8
-		if err := rows.Scan(&o.ProjectId, &o.TransactionId, &o.TransactionType, &o.ExceptionHash, &o.StackTrace, &o.RecordedAt, &scopeJSON, &o.AppVersion, &o.ServerName, &isMessage); err != nil {
+		if err := rows.Scan(&o.Id, &o.ProjectId, &o.TransactionId, &o.TransactionType, &o.ExceptionHash, &o.StackTrace, &o.RecordedAt, &scopeJSON, &o.AppVersion, &o.ServerName, &isMessage); err != nil {
 			return nil, nil, 0, err
 		}
 		o.IsMessage = isMessage == 1
@@ -312,17 +328,84 @@ func (e *exceptionStackTraceRepository) FindByTransactionId(ctx context.Context,
 	var isMessage uint8
 
 	err := (*chdb.Conn).QueryRow(ctx,
-		`SELECT project_id, transaction_id, transaction_type, exception_hash, stack_trace, recorded_at, scope, app_version, server_name, is_message
+		`SELECT id, project_id, transaction_id, transaction_type, exception_hash, stack_trace, recorded_at, scope, app_version, server_name, is_message
 		FROM exception_stack_traces
 		WHERE project_id = ? AND transaction_id = ?
 		LIMIT 1`,
 		projectId, transactionId).Scan(
-		&est.ProjectId, &est.TransactionId, &est.TransactionType, &est.ExceptionHash, &est.StackTrace,
+		&est.Id, &est.ProjectId, &est.TransactionId, &est.TransactionType, &est.ExceptionHash, &est.StackTrace,
 		&est.RecordedAt, &scopeJSON, &est.AppVersion, &est.ServerName, &isMessage)
 
 	if err != nil {
 		// No exception found for this transaction
 		return nil, nil
+	}
+
+	est.IsMessage = isMessage == 1
+	// Parse scope JSON
+	if scopeJSON != "" && scopeJSON != "{}" {
+		if err := json.Unmarshal([]byte(scopeJSON), &est.Scope); err != nil {
+			est.Scope = nil
+		}
+	}
+
+	return &est, nil
+}
+
+// FindAllByTransactionId returns all exceptions and messages associated with a specific transaction
+func (e *exceptionStackTraceRepository) FindAllByTransactionId(ctx context.Context, projectId string, transactionId string) ([]models.ExceptionStackTrace, error) {
+	rows, err := (*chdb.Conn).Query(ctx,
+		`SELECT id, project_id, transaction_id, transaction_type, exception_hash, stack_trace, recorded_at, scope, app_version, server_name, is_message
+		FROM exception_stack_traces
+		WHERE project_id = ? AND transaction_id = ?
+		ORDER BY recorded_at ASC`,
+		projectId, transactionId)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []models.ExceptionStackTrace
+	for rows.Next() {
+		var est models.ExceptionStackTrace
+		var scopeJSON string
+		var isMessage uint8
+
+		if err := rows.Scan(&est.Id, &est.ProjectId, &est.TransactionId, &est.TransactionType, &est.ExceptionHash, &est.StackTrace,
+			&est.RecordedAt, &scopeJSON, &est.AppVersion, &est.ServerName, &isMessage); err != nil {
+			return nil, err
+		}
+
+		est.IsMessage = isMessage == 1
+		if scopeJSON != "" && scopeJSON != "{}" {
+			if err := json.Unmarshal([]byte(scopeJSON), &est.Scope); err != nil {
+				est.Scope = nil
+			}
+		}
+		results = append(results, est)
+	}
+
+	return results, nil
+}
+
+// FindById returns a single exception by its ID
+func (e *exceptionStackTraceRepository) FindById(ctx context.Context, projectId string, id string) (*models.ExceptionStackTrace, error) {
+	var est models.ExceptionStackTrace
+	var scopeJSON string
+	var isMessage uint8
+
+	err := (*chdb.Conn).QueryRow(ctx,
+		`SELECT id, project_id, transaction_id, transaction_type, exception_hash, stack_trace, recorded_at, scope, app_version, server_name, is_message
+		FROM exception_stack_traces
+		WHERE project_id = ? AND id = ?
+		LIMIT 1`,
+		projectId, id).Scan(
+		&est.Id, &est.ProjectId, &est.TransactionId, &est.TransactionType, &est.ExceptionHash, &est.StackTrace,
+		&est.RecordedAt, &scopeJSON, &est.AppVersion, &est.ServerName, &isMessage)
+
+	if err != nil {
+		return nil, ErrExceptionNotFound
 	}
 
 	est.IsMessage = isMessage == 1

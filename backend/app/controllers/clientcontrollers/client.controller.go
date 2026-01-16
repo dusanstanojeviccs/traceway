@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type clientController struct{}
@@ -59,7 +60,8 @@ func (e clientController) Report(c *gin.Context) {
 		}
 
 		for _, cst := range cf.StackTraces {
-			est := cst.ToExceptionStackTrace(computeExceptionHash(cst.StackTrace), request.AppVersion, request.ServerName)
+			est := cst.ToExceptionStackTrace(computeExceptionHash(cst.StackTrace, cst.IsMessage), request.AppVersion, request.ServerName)
+			est.Id = uuid.New().String()
 			est.ProjectId = projectId
 			exceptionStackTraceToInsert = append(exceptionStackTraceToInsert, est)
 		}
@@ -120,40 +122,43 @@ var (
 	newlinesRe     = regexp.MustCompile(`\n+`)
 )
 
-func computeExceptionHash(stackTrace string) string {
+func computeExceptionHash(stackTrace string, isMessage bool) string {
 	normalized := stackTrace
 
-	// Remove the error message content (keep just the error type)
-	normalized = errorMessageRe.ReplaceAllString(normalized, "$1")
+	if !isMessage {
+		// Only normalize for actual exceptions, not messages
+		// Remove the error message content (keep just the error type)
+		normalized = errorMessageRe.ReplaceAllString(normalized, "$1")
 
-	// Remove absolute paths, keep just filename:line
-	normalized = absolutePathRe.ReplaceAllString(normalized, "$1")
+		// Remove absolute paths, keep just filename:line
+		normalized = absolutePathRe.ReplaceAllString(normalized, "$1")
 
-	// Remove version numbers from module paths
-	normalized = versionRe.ReplaceAllString(normalized, "")
+		// Remove version numbers from module paths
+		normalized = versionRe.ReplaceAllString(normalized, "")
 
-	// Replace hex addresses/pointers
-	normalized = hexRe.ReplaceAllString(normalized, "<hex>")
+		// Replace hex addresses/pointers
+		normalized = hexRe.ReplaceAllString(normalized, "<hex>")
 
-	// Replace UUIDs
-	normalized = uuidRe.ReplaceAllString(normalized, "<uuid>")
+		// Replace UUIDs
+		normalized = uuidRe.ReplaceAllString(normalized, "<uuid>")
 
-	// Replace standalone large numbers (likely IDs, not line numbers)
-	// Since Go doesn't support lookbehind, we preserve the surrounding characters
-	normalized = largeNumberRe.ReplaceAllString(normalized, "${1}<id>${3}")
+		// Replace standalone large numbers (likely IDs, not line numbers)
+		// Since Go doesn't support lookbehind, we preserve the surrounding characters
+		normalized = largeNumberRe.ReplaceAllString(normalized, "${1}<id>${3}")
 
-	// Replace email addresses
-	normalized = emailRe.ReplaceAllString(normalized, "<email>")
+		// Replace email addresses
+		normalized = emailRe.ReplaceAllString(normalized, "<email>")
 
-	// Replace IP addresses
-	normalized = ipRe.ReplaceAllString(normalized, "<ip>")
+		// Replace IP addresses
+		normalized = ipRe.ReplaceAllString(normalized, "<ip>")
 
-	// Normalize goroutine numbers
-	normalized = goroutineRe.ReplaceAllString(normalized, "goroutine <n>")
+		// Normalize goroutine numbers
+		normalized = goroutineRe.ReplaceAllString(normalized, "goroutine <n>")
 
-	// Normalize whitespace
-	normalized = spacesRe.ReplaceAllString(normalized, " ")
-	normalized = newlinesRe.ReplaceAllString(normalized, "\n")
+		// Normalize whitespace
+		normalized = spacesRe.ReplaceAllString(normalized, " ")
+		normalized = newlinesRe.ReplaceAllString(normalized, "\n")
+	}
 
 	// Compute SHA-256 and return first 16 hex characters
 	normalized = strings.TrimSpace(normalized)

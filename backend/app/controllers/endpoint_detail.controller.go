@@ -20,11 +20,20 @@ type EndpointExceptionInfo struct {
 	RecordedAt    string `json:"recordedAt"`
 }
 
+type EndpointMessageInfo struct {
+	Id            string            `json:"id"`
+	ExceptionHash string            `json:"exceptionHash"`
+	StackTrace    string            `json:"stackTrace"`
+	RecordedAt    string            `json:"recordedAt"`
+	Scope         map[string]string `json:"scope,omitempty"`
+}
+
 type EndpointDetailResponse struct {
 	Endpoint    *models.Endpoint       `json:"endpoint"`
 	Segments    []models.Segment       `json:"segments"`
 	HasSegments bool                   `json:"hasSegments"`
 	Exception   *EndpointExceptionInfo `json:"exception,omitempty"`
+	Messages    []EndpointMessageInfo  `json:"messages"`
 }
 
 func (c endpointDetailController) GetEndpointDetail(ctx *gin.Context) {
@@ -53,18 +62,37 @@ func (c endpointDetailController) GetEndpointDetail(ctx *gin.Context) {
 		panic(err)
 	}
 
-	// Get linked exception if any
+	// Get all linked exceptions and messages
 	var exceptionInfo *EndpointExceptionInfo
-	exception, err := repositories.ExceptionStackTraceRepository.FindByTransactionId(ctx, request.ProjectId, endpointId)
+	var messages []EndpointMessageInfo
+
+	allExceptions, err := repositories.ExceptionStackTraceRepository.FindAllByTransactionId(ctx, request.ProjectId, endpointId)
 	if err != nil {
 		panic(err)
 	}
-	if exception != nil {
-		exceptionInfo = &EndpointExceptionInfo{
-			ExceptionHash: exception.ExceptionHash,
-			StackTrace:    exception.StackTrace,
-			RecordedAt:    exception.RecordedAt.Format("2006-01-02T15:04:05Z07:00"),
+
+	for _, exc := range allExceptions {
+		if exc.IsMessage {
+			// Add to messages list
+			messages = append(messages, EndpointMessageInfo{
+				Id:            exc.Id,
+				ExceptionHash: exc.ExceptionHash,
+				StackTrace:    exc.StackTrace,
+				RecordedAt:    exc.RecordedAt.Format("2006-01-02T15:04:05Z07:00"),
+				Scope:         exc.Scope,
+			})
+		} else if exceptionInfo == nil {
+			// Only take the first actual exception
+			exceptionInfo = &EndpointExceptionInfo{
+				ExceptionHash: exc.ExceptionHash,
+				StackTrace:    exc.StackTrace,
+				RecordedAt:    exc.RecordedAt.Format("2006-01-02T15:04:05Z07:00"),
+			}
 		}
+	}
+
+	if messages == nil {
+		messages = []EndpointMessageInfo{}
 	}
 
 	ctx.JSON(http.StatusOK, EndpointDetailResponse{
@@ -72,6 +100,7 @@ func (c endpointDetailController) GetEndpointDetail(ctx *gin.Context) {
 		Segments:    segments,
 		HasSegments: len(segments) > 0,
 		Exception:   exceptionInfo,
+		Messages:    messages,
 	})
 }
 

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 	import { createRowClickHandler } from '$lib/utils/navigation';
 	import { api } from '$lib/api';
 	import * as Table from '$lib/components/ui/table';
@@ -17,9 +18,30 @@
 	import { TracewayTableHeader } from '$lib/components/ui/traceway-table-header';
 	import { TableEmptyState } from '$lib/components/ui/table-empty-state';
 	import { PaginationFooter } from '$lib/components/ui/pagination-footer';
-	import { formatDateTime, getNow, toUTCISO } from '$lib/utils/formatters';
+	import { TimeRangePicker } from '$lib/components/ui/time-range-picker';
+	import { CalendarDate } from '@internationalized/date';
+	import {
+		parseTimeRangeFromUrl,
+		getResolvedTimeRange,
+		dateToCalendarDate,
+		dateToTimeString,
+		updateUrl
+	} from '$lib/utils/url-params';
+	import { calendarDateTimeToLuxon, toUTCISO, formatDateTime } from '$lib/utils/formatters';
+	import {
+		getSortState,
+		setSortState,
+		handleSortClick,
+		type SortDirection
+	} from '$lib/utils/sort-storage';
 
 	const timezone = $derived(getTimezone());
+
+	// Sort state (persisted to localStorage)
+	const SORT_STORAGE_KEY = 'issues';
+	const initialSort = getSortState(SORT_STORAGE_KEY, { field: 'last_seen', direction: 'desc' });
+	let sortField = $state(initialSort.field);
+	let sortDirection = $state<SortDirection>(initialSort.direction);
 
 	type ExceptionTrendPoint = {
 		timestamp: string;
@@ -55,15 +77,42 @@
 	const allSelected = $derived(exceptions.length > 0 && selectedHashes.size === exceptions.length);
 	const someSelected = $derived(selectedHashes.size > 0 && selectedHashes.size < exceptions.length);
 
-	// Filters
-	let searchQuery = $state('');
-	let daysBack = $state('7');
+	// Parse URL params on init
+	function parseIssuesUrlParams() {
+		if (!browser) return { preset: '24h', from: null, to: null, search: '', searchType: 'all' };
+		const params = new URLSearchParams(window.location.search);
+		const timeParams = parseTimeRangeFromUrl(timezone, '24h');
+		return {
+			...timeParams,
+			search: params.get('search') || '',
+			searchType: params.get('searchType') || 'all'
+		};
+	}
 
-	// Select options for days back
-	const daysOptions = [
-		{ value: '1', label: '24 Hours' },
-		{ value: '7', label: '7 Days' }
+	const initialUrlParams = parseIssuesUrlParams();
+	const initialRange = getResolvedTimeRange(initialUrlParams, timezone);
+
+	// Time range state
+	let selectedPreset = $state<string | null>(initialUrlParams.preset);
+	let fromDate = $state<CalendarDate>(dateToCalendarDate(initialRange.from));
+	let toDate = $state<CalendarDate>(dateToCalendarDate(initialRange.to));
+	let fromTime = $state(dateToTimeString(initialRange.from));
+	let toTime = $state(dateToTimeString(initialRange.to));
+
+	// Search state (manual trigger only)
+	let searchQuery = $state(initialUrlParams.search);
+	let searchType = $state(initialUrlParams.searchType);
+
+	// Search type options
+	const searchTypeOptions = [
+		{ value: 'all', label: 'All' },
+		{ value: 'issues', label: 'Issues' },
+		{ value: 'messages', label: 'Messages' }
 	];
+
+	const searchTypeLabel = $derived(
+		searchTypeOptions.find((o) => o.value === searchType)?.label ?? 'All'
+	);
 
 	// Page size options
 	const pageSizeOptions = [
@@ -73,31 +122,58 @@
 		{ value: '100', label: '100' }
 	];
 
-	// Derived labels for select displays
-	const daysBackLabel = $derived(
-		daysOptions.find((o) => o.value === daysBack)?.label ?? 'Select period'
-	);
-	const pageSizeLabel = $derived(
-		pageSizeOptions.find((o) => o.value === pageSize.toString())?.label ?? pageSize.toString()
-	);
+	// Helper functions for date/time conversion
+	function getFromDateTimeUTC(): string {
+		const [hour, minute] = fromTime.split(':').map(Number);
+		const luxonDt = calendarDateTimeToLuxon(
+			{ year: fromDate.year, month: fromDate.month, day: fromDate.day, hour, minute },
+			timezone
+		);
+		return toUTCISO(luxonDt);
+	}
 
-	async function loadData() {
+	function getToDateTimeUTC(): string {
+		const [hour, minute] = toTime.split(':').map(Number);
+		const luxonDt = calendarDateTimeToLuxon(
+			{ year: toDate.year, month: toDate.month, day: toDate.day, hour, minute },
+			timezone
+		);
+		return toUTCISO(luxonDt);
+	}
+
+	function updateIssuesUrl(pushToHistory = true) {
+		const params: Record<string, string | null | undefined> = {};
+		if (selectedPreset) {
+			params.preset = selectedPreset;
+		} else {
+			params.from = getFromDateTimeUTC();
+			params.to = getToDateTimeUTC();
+		}
+		if (searchQuery.trim()) params.search = searchQuery.trim();
+		if (searchType !== 'all') params.searchType = searchType;
+		updateUrl(params, { pushToHistory });
+	}
+
+	async function loadData(pushToHistory = true) {
 		loading = true;
 		error = '';
 
+		updateIssuesUrl(pushToHistory);
+
 		try {
-			const now = getNow(timezone);
-			const fromDate = now.minus({ days: parseInt(daysBack) });
+			// Build orderBy with direction suffix for backend
+			const orderBy = sortDirection === 'asc' ? `${sortField}_asc` : sortField;
 
 			const requestBody = {
-				fromDate: toUTCISO(fromDate),
-				toDate: toUTCISO(now),
-				orderBy: 'last_seen',
+				fromDate: getFromDateTimeUTC(),
+				toDate: getToDateTimeUTC(),
+				orderBy,
 				pagination: {
 					page: page,
 					pageSize: pageSize
 				},
 				search: searchQuery.trim(),
+				searchType: searchType,
 				includeArchived: false
 			};
 
@@ -122,25 +198,56 @@
 	function handlePageChange(newPage: number) {
 		if (newPage >= 1 && newPage <= totalPages) {
 			page = newPage;
-			loadData();
+			loadData(true);
 		}
 	}
 
 	function handlePageSizeChange(newPageSize: number) {
 		pageSize = newPageSize;
 		page = 1;
-		loadData();
+		loadData(true);
 	}
 
-	// Debounce search input
-	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+	function handleTimeRangeChange(
+		from: { date: CalendarDate; time: string },
+		to: { date: CalendarDate; time: string },
+		preset: string | null
+	) {
+		fromDate = from.date;
+		toDate = to.date;
+		fromTime = from.time;
+		toTime = to.time;
+		selectedPreset = preset;
+		page = 1;
+		loadData(true);
+	}
 
-	function handleSearchInput() {
-		if (searchTimeout) clearTimeout(searchTimeout);
-		searchTimeout = setTimeout(() => {
-			page = 1;
-			loadData();
-		}, 300);
+	function handleSearch() {
+		page = 1;
+		loadData(true);
+	}
+
+	function handleSort(field: string) {
+		const newSort = handleSortClick(field, sortField, sortDirection);
+		sortField = newSort.field;
+		sortDirection = newSort.direction;
+		setSortState(SORT_STORAGE_KEY, newSort);
+		page = 1;
+		loadData(true);
+	}
+
+	function handlePopState() {
+		const urlParams = parseIssuesUrlParams();
+		const range = getResolvedTimeRange(urlParams, timezone);
+		selectedPreset = urlParams.preset;
+		fromDate = dateToCalendarDate(range.from);
+		toDate = dateToCalendarDate(range.to);
+		fromTime = dateToTimeString(range.from);
+		toTime = dateToTimeString(range.to);
+		searchQuery = urlParams.search;
+		searchType = urlParams.searchType;
+		page = 1;
+		loadData(false);
 	}
 
 	// Selection handlers
@@ -193,41 +300,61 @@
 	}
 
 	onMount(() => {
-		loadData();
+		window.addEventListener('popstate', handlePopState);
+		loadData(false);
+	});
+
+	onDestroy(() => {
+		if (typeof window !== 'undefined') {
+			window.removeEventListener('popstate', handlePopState);
+		}
 	});
 </script>
 
 <div class="space-y-4">
-	<!-- Header with Title and Search + Period Filter -->
+	<!-- Row 1: Title + TimeRangePicker -->
 	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 		<h2 class="text-2xl font-bold tracking-tight">Issues</h2>
-		<div class="flex">
-			<Input
-				placeholder="Search exceptions..."
-				class="h-9 w-[250px] rounded-r-none border-r-0 focus:relative focus:z-10 lg:w-[320px]"
-				bind:value={searchQuery}
-				oninput={handleSearchInput}
+		<div class="w-full sm:w-auto">
+			<TimeRangePicker
+				bind:fromDate
+				bind:toDate
+				bind:fromTime
+				bind:toTime
+				bind:preset={selectedPreset}
+				onApply={handleTimeRangeChange}
 			/>
-			<Select.Root
-				type="single"
-				bind:value={daysBack}
-				onValueChange={(v) => {
-					if (v) {
-						page = 1;
-						loadData();
-					}
-				}}
-			>
-				<Select.Trigger class="-ml-px h-9 w-[110px] rounded-l-none focus:relative focus:z-10">
-					{daysBackLabel}
-				</Select.Trigger>
-				<Select.Content>
-					{#each daysOptions as option}
-						<Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
-					{/each}
-				</Select.Content>
-			</Select.Root>
 		</div>
+	</div>
+
+	<!-- Row 2: Search Type Dropdown + Search Input + Go Button -->
+	<div class="flex">
+
+		<Input
+			placeholder="Search exceptions..."
+			class="h-9 w-[250px] rounded-r-none border-r-0 lg:w-[320px]"
+			bind:value={searchQuery}
+			onkeydown={(e) => {
+				if (e.key === 'Enter') handleSearch();
+			}}
+		/>
+
+		<Select.Root type="single" bind:value={searchType}>
+			<Select.Trigger class="h-9 w-[110px] rounded-none border-r-0">
+				{searchTypeLabel}
+			</Select.Trigger>
+			<Select.Content>
+				{#each searchTypeOptions as option}
+					<Select.Item value={option.value} label={option.label}>
+						{option.label}
+					</Select.Item>
+				{/each}
+			</Select.Content>
+		</Select.Root>
+
+		<Button variant="outline" class="h-9 rounded-l-none" onclick={handleSearch} disabled={loading}>
+			Go
+		</Button>
 	</div>
 
 	<!-- Archive Toolbar - shown when items selected -->
@@ -302,11 +429,19 @@
 							tooltip="Total number of times this issue occurred in the selected range"
 							align="right"
 							class="w-[80px]"
+							sortField="count"
+							currentSortField={sortField}
+							{sortDirection}
+							onSort={handleSort}
 						/>
 						<TracewayTableHeader
 							label="Last Seen"
 							tooltip="When this issue last occurred"
 							class="w-[180px]"
+							sortField="last_seen"
+							currentSortField={sortField}
+							{sortDirection}
+							onSort={handleSort}
 						/>
 					</Table.Row>
 				</Table.Header>

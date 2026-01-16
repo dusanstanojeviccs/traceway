@@ -23,6 +23,12 @@
         getResolvedTimeRange,
         updateUrl
     } from '$lib/utils/url-params';
+    import {
+        getSortState,
+        setSortState,
+        handleSortClick,
+        type SortDirection
+    } from '$lib/utils/sort-storage';
 
     const timezone = $derived(getTimezone());
 
@@ -36,7 +42,6 @@
     };
 
     type SortField = 'count' | 'p50_duration' | 'p95_duration' | 'last_seen';
-    type SortDirection = 'asc' | 'desc';
 
     let tasks = $state<TaskStats[]>([]);
     let loading = $state(true);
@@ -84,9 +89,11 @@
         loadData(false);
     }
 
-    // Sorting - default to count descending
-    let orderBy = $state<SortField>('count');
-    let sortDirection = $state<SortDirection>('desc');
+    // Sorting - persisted to localStorage
+    const SORT_STORAGE_KEY = 'tasks';
+    const initialSort = getSortState(SORT_STORAGE_KEY, { field: 'count', direction: 'desc' });
+    let orderBy = $state<SortField>(initialSort.field as SortField);
+    let sortDirection = $state<SortDirection>(initialSort.direction);
 
     // Combine date and time into UTC ISO datetime string
     function getFromDateTimeUTC(): string {
@@ -167,16 +174,12 @@
     }
 
     function handleSort(field: SortField) {
-        if (orderBy === field) {
-            // Toggle direction if clicking the same field
-            sortDirection = sortDirection === 'desc' ? 'asc' : 'desc';
-        } else {
-            // New field, default to descending
-            orderBy = field;
-            sortDirection = 'desc';
-        }
+        const newSort = handleSortClick(field, orderBy, sortDirection);
+        orderBy = newSort.field as SortField;
+        sortDirection = newSort.direction;
+        setSortState(SORT_STORAGE_KEY, newSort);
         page = 1;
-        loadData(false); // Don't push to history for sorting
+        loadData(false);
     }
 
     onMount(() => {

@@ -37,7 +37,7 @@ export type TimeRangeParams = {
 	to: Date | null;
 };
 
-export function parseTimeRangeFromUrl(timezone: string, defaultPreset = '6h'): TimeRangeParams {
+export function parseTimeRangeFromUrl(timezone: string, defaultPreset = '24h'): TimeRangeParams {
 	if (!browser) return { preset: defaultPreset, from: null, to: null };
 
 	const params = new URLSearchParams(window.location.search);
@@ -94,6 +94,7 @@ export function updateUrl(
 
 	const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
 
+	// eslint-disable-next-line svelte/no-navigation-without-resolve
 	goto(newUrl, {
 		replaceState: !pushToHistory,
 		noScroll: true,

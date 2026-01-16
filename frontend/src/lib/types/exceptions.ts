@@ -7,6 +7,7 @@ export type ExceptionGroup = {
 };
 
 export type ExceptionOccurrence = {
+    id: string;
     transactionId: string | null;
     transactionType: 'endpoint' | 'task';
     exceptionHash: string;

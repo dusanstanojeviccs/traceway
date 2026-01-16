@@ -3,6 +3,7 @@ package models
 import "time"
 
 type ExceptionStackTrace struct {
+	Id              string            `json:"id" ch:"id"`
 	ProjectId       string            `json:"projectId" ch:"project_id"`
 	TransactionId   *string           `json:"transactionId" ch:"transaction_id"`
 	TransactionType string            `json:"transactionType" ch:"transaction_type"` // "endpoint" or "task"

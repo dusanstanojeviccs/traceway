@@ -15,7 +15,7 @@
         total: number;
         hasMore?: boolean;
         showViewAll?: boolean;
-        currentRecordedAt?: string;
+        currentExceptionId?: string;
         timezone?: string;
     }
 
@@ -25,18 +25,18 @@
         total,
         hasMore = false,
         showViewAll = true,
-        currentRecordedAt,
+        currentExceptionId,
         timezone
     }: Props = $props();
 
     const tz = $derived(timezone ?? getTimezone());
 
     function getRowUrl(occurrence: ExceptionOccurrence): string {
-        return `/issues/${exceptionHash}/${encodeURIComponent(occurrence.recordedAt)}`;
+        return `/issues/${exceptionHash}/${occurrence.id}`;
     }
 
     function isCurrentEvent(occurrence: ExceptionOccurrence): boolean {
-        return currentRecordedAt !== undefined && occurrence.recordedAt === currentRecordedAt;
+        return currentExceptionId !== undefined && occurrence.id === currentExceptionId;
     }
 </script>
 

@@ -23,6 +23,12 @@
         dateToTimeString,
         updateUrl
     } from '$lib/utils/url-params';
+    import {
+        getSortState,
+        setSortState,
+        handleSortClick,
+        type SortDirection
+    } from '$lib/utils/sort-storage';
 
     const timezone = $derived(getTimezone());
 
@@ -47,7 +53,6 @@
     };
 
     type SortField = 'recorded_at' | 'duration';
-    type SortDirection = 'asc' | 'desc';
 
     let { data } = $props();
 
@@ -81,9 +86,9 @@
             }
         }
 
-        // Default to 6h preset
-        const range = getTimeRangeFromPreset('6h', timezone);
-        return { preset: '6h', from: range.from, to: range.to };
+        // Default to 24h preset
+        const range = getTimeRangeFromPreset('24h', timezone);
+        return { preset: '24h', from: range.from, to: range.to };
     }
 
     const initialRange = getInitialRange();
@@ -104,9 +109,11 @@
         );
     }
 
-    // Sorting State
-    let orderBy = $state<SortField>('recorded_at');
-    let sortDirection = $state<SortDirection>('desc');
+    // Sorting State - persisted to localStorage
+    const SORT_STORAGE_KEY = 'task_detail';
+    const initialSort = getSortState(SORT_STORAGE_KEY, { field: 'recorded_at', direction: 'desc' });
+    let orderBy = $state<SortField>(initialSort.field as SortField);
+    let sortDirection = $state<SortDirection>(initialSort.direction);
 
     // Combine date and time into UTC ISO datetime string
     function getFromDateTimeUTC(): string {
@@ -184,14 +191,10 @@
     }
 
     function handleSort(field: SortField) {
-        if (orderBy === field) {
-            // Toggle direction if clicking the same field
-            sortDirection = sortDirection === 'desc' ? 'asc' : 'desc';
-        } else {
-            // New field, default to descending
-            orderBy = field;
-            sortDirection = 'desc';
-        }
+        const newSort = handleSortClick(field, orderBy, sortDirection);
+        orderBy = newSort.field as SortField;
+        sortDirection = newSort.direction;
+        setSortState(SORT_STORAGE_KEY, newSort);
         page = 1;
         loadData(false);
     }
@@ -318,10 +321,7 @@
                         <Table.Row
                             class="cursor-pointer hover:bg-muted/50"
                             onclick={createRowClickHandler(
-                                resolve("/tasks/[task]/[taskId]", {
-                                    task: data.task,
-                                    taskId: task.id,
-                                }))}
+                                `/tasks/${encodeURIComponent(decodeURIComponent(data.task))}/${task.id}`)}
                         >
                             <Table.Cell class="text-muted-foreground">
                                 {formatDateTime(task.recordedAt, { timezone })}

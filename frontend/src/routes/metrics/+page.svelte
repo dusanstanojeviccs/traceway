@@ -74,7 +74,7 @@
 		servers: string[];
 		tab: MetricsTab;
 	} {
-		if (!browser) return { preset: '6h', from: null, to: null, servers: [], tab: 'application' };
+		if (!browser) return { preset: '24h', from: null, to: null, servers: [], tab: 'application' };
 
 		const params = new URLSearchParams(window.location.search);
 		const serversParam = params.get('servers');
@@ -382,9 +382,6 @@
 				bind:preset={selectedPreset}
 				onApply={handleTimeRangeChange}
 			/>
-			<Button variant="outline" size="sm" onclick={() => reloadActiveTab()} disabled={isCurrentTabLoading()}>
-				<RefreshCw class="h-4 w-4 {isCurrentTabLoading() ? 'animate-spin' : ''}" />
-			</Button>
 		</div>
 	</div>
 
@@ -410,9 +407,15 @@
 			</div>
 
 			{#if lastUpdated()}
-				<span class="text-sm text-muted-foreground whitespace-nowrap">
-					Updated: {lastUpdatedFormatted}
-				</span>
+				<div class="flex items-center gap-1">
+					<span class="text-sm text-muted-foreground whitespace-nowrap">
+						Updated: {lastUpdatedFormatted}
+					</span>
+
+					<Button variant="ghost" size="sm" onclick={() => reloadActiveTab()} disabled={isCurrentTabLoading()}>
+						<RefreshCw class="h-4 w-4 {isCurrentTabLoading() ? 'animate-spin' : ''}" />
+					</Button>
+				</div>
 			{/if}
 		</div>
 
