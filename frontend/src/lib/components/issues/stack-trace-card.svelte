@@ -23,7 +23,7 @@
 </script>
 
 <Card.Root>
-    <Card.Header class={showStats ? '' : 'pb-0'}>
+    <Card.Header class={showStats ? '' : 'pb-0 gap-0'}>
         <div class="flex justify-between">
             <div class="flex items-center gap-2">
                 <Card.Title>
