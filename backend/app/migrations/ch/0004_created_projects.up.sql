@@ -2,6 +2,11 @@ CREATE TABLE IF NOT EXISTS projects (
     id String,
     name String,
     token String,
-    created_at DateTime DEFAULT now()
+    framework LowCardinality(String) DEFAULT 'custom',
+    created_at DateTime DEFAULT now(),
+
+    INDEX idx_token token TYPE bloom_filter(0.001) GRANULARITY 1,
+    INDEX idx_id id TYPE bloom_filter(0.001) GRANULARITY 1
 ) ENGINE = MergeTree()
-ORDER BY (created_at, id)
+ORDER BY (id)
+SETTINGS index_granularity = 8192

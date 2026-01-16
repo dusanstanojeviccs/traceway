@@ -32,6 +32,7 @@
     };
 
     type ExceptionOccurrence = {
+        id: string;
         transactionId: string | null;
         exceptionHash: string;
         stackTrace: string;
@@ -224,7 +225,7 @@
                         {#each occurrences as occurrence}
                             <Table.Row
                                 class="cursor-pointer hover:bg-muted/50"
-                                onclick={createRowClickHandler(`/issues/${page.params.exceptionHash}/${encodeURIComponent(occurrence.recordedAt)}`)}
+                                onclick={createRowClickHandler(`/issues/${page.params.exceptionHash}/${occurrence.id}`)}
                             >
                                 <Table.Cell>{formatDateTime(occurrence.recordedAt, { timezone })}</Table.Cell>
                                 <Table.Cell class="font-mono text-sm text-muted-foreground">

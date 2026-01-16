@@ -33,6 +33,7 @@
     const isMessage = $derived(occurrence?.isMessage ?? false);
     const firstLineOfStackTrace = $derived(group?.stackTrace.split('\n')[0] || 'Exception');
     const hasMoreOccurrences = $derived(total > 10);
+    const subtitleText = $derived(occurrence ? `Event from ${formatDateTime(occurrence.recordedAt, { timezone })}` : 'Loading...');
 
     async function loadData() {
         loading = true;
@@ -41,7 +42,16 @@
         linkedTransaction = null;
 
         try {
-            // Load all occurrences for this hash
+            // Load the specific exception by ID
+            const exceptionResponse = await api.post(`/exception-stack-traces/by-id/${data.exceptionId}`, {}, { projectId: projectsState.currentProjectId ?? undefined });
+            occurrence = exceptionResponse.exception;
+
+            if (!occurrence) {
+                notFound = true;
+                return;
+            }
+
+            // Load all occurrences for this hash (for the events table)
             const response = await api.post(`/exception-stack-traces/${data.exceptionHash}`, {
                 pagination: {
                     page: 1,
@@ -53,33 +63,38 @@
             allOccurrences = response.occurrences || [];
             total = response.pagination.total;
 
-            // Find the specific occurrence by recordedAt
-            occurrence = allOccurrences.find(o => o.recordedAt === data.recordedAt) || null;
-
-            if (!occurrence) {
-                notFound = true;
-                return;
-            }
-
             // Load linked transaction if this occurrence has a transactionId
             if (occurrence.transactionId) {
                 try {
+                    const isTask = occurrence.transactionType === 'task';
+                    console.log('DEBUG linked transaction:', {
+                        transactionId: occurrence.transactionId,
+                        transactionType: occurrence.transactionType,
+                        isTask
+                    });
+                    const endpoint = isTask ? '/tasks' : '/endpoints';
                     const txResponse = await api.post(
-                        `/transactions/${occurrence.transactionId}`,
+                        `${endpoint}/${occurrence.transactionId}`,
                         {},
                         { projectId: projectsState.currentProjectId ?? undefined }
                     );
-                    if (txResponse.transaction) {
+                    const txData = isTask ? txResponse.task : txResponse.endpoint;
+                    if (txData) {
                         linkedTransaction = {
-                            id: txResponse.transaction.id,
-                            endpoint: txResponse.transaction.endpoint,
-                            duration: txResponse.transaction.duration,
-                            statusCode: txResponse.transaction.statusCode,
-                            recordedAt: txResponse.transaction.recordedAt
+                            id: txData.id,
+                            endpoint: isTask ? txData.taskName : txData.endpoint,
+                            duration: txData.duration,
+                            statusCode: txData.statusCode || 0,
+                            recordedAt: txData.recordedAt,
+                            transactionType: isTask ? 'task' : 'endpoint'
                         };
                     }
                 } catch (txError) {
-                    console.warn('Could not load linked transaction:', txError);
+                    console.error('Failed to load linked transaction:', {
+                        error: txError,
+                        transactionId: occurrence.transactionId,
+                        transactionType: occurrence.transactionType
+                    });
                 }
             }
         } catch (e: any) {
@@ -120,7 +135,7 @@
 <div class="space-y-6">
     <PageHeader
         title={firstLineOfStackTrace}
-        subtitle="Event from {formatDateTime(data.recordedAt, { timezone })}"
+        subtitle={subtitleText}
         onBack={createRowClickHandler(resolve("/issues/[exceptionHash]", {exceptionHash: data.exceptionHash}))}
     />
 
@@ -167,7 +182,7 @@
             {total}
             hasMore={hasMoreOccurrences}
             showViewAll={true}
-            currentRecordedAt={data.recordedAt}
+            currentExceptionId={data.exceptionId}
         />
     {/if}
 </div>

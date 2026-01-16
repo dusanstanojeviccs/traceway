@@ -6,10 +6,11 @@
 	import { getTimezone } from '$lib/state/timezone.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
+	import * as Table from '$lib/components/ui/table';
 	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import { ErrorDisplay } from '$lib/components/ui/error-display';
 	import { projectsState } from '$lib/state/projects.svelte';
-	import { ArrowLeft, ArrowRight, TriangleAlert } from 'lucide-svelte';
+	import { ArrowLeft, ArrowRight, TriangleAlert, ClipboardList } from 'lucide-svelte';
 	import { LabelValue } from '$lib/components/ui/label-value';
 	import { ContextGrid } from '$lib/components/ui/context-grid';
 	import SegmentWaterfall from '$lib/components/segments/segment-waterfall.svelte';
@@ -35,7 +36,7 @@
 
 		try {
 			const result = await api.post(
-				`/transactions/${data.transactionId}`,
+				`/endpoints/${data.endpointId}`,
 				{},
 				{ projectId: projectsState.currentProjectId ?? undefined }
 			);
@@ -46,7 +47,7 @@
 			if (err.status === 404) {
 				notFound = true;
 			} else {
-				error = err.message || 'Failed to load transaction details';
+				error = err.message || 'Failed to load endpoint details';
 			}
 		} finally {
 			loading = false;
@@ -70,8 +71,8 @@
 
 <div class="space-y-6">
 	<PageHeader
-		title={decodeURIComponent(data.endpoint)} subtitle={`Transaction ID: ${data.transactionId}`}
-		onBack={createRowClickHandler(resolve('/transactions/[endpoint]', {endpoint: encodeURIComponent(data.endpoint)}))} />
+		title={decodeURIComponent(data.endpoint)} subtitle={`Endpoint ID: ${data.endpointId}`}
+		onBack={createRowClickHandler(resolve('/endpoints/[endpoint]', {endpoint: encodeURIComponent(data.endpoint)}))} />
 
 
 	{#if loading}
@@ -81,28 +82,28 @@
 	{:else if notFound}
 		<ErrorDisplay
 			status={404}
-			title="Transaction Not Found"
-			description="The transaction you're looking for doesn't exist or may have expired."
-			onBack={createRowClickHandler(resolve('/transactions/[endpoint]', {endpoint: encodeURIComponent(data.endpoint)}))}
+			title="Endpoint Not Found"
+			description="The endpoint instance you're looking for doesn't exist or may have expired."
+			onBack={createRowClickHandler(resolve('/endpoints/[endpoint]', {endpoint: encodeURIComponent(data.endpoint)}))}
 			backLabel="Back to Endpoint"
 			onRetry={loadData}
-			identifier={data.transactionId}
+			identifier={data.endpointId}
 		/>
 	{:else if error}
 		<ErrorDisplay
 			status={400}
-			title="Failed to Load Transaction"
+			title="Failed to Load Endpoint"
 			description={error}
-			onBack={createRowClickHandler(resolve('/transactions/[endpoint]', {endpoint: encodeURIComponent(data.endpoint)}))}
+			onBack={createRowClickHandler(resolve('/endpoints/[endpoint]', {endpoint: encodeURIComponent(data.endpoint)}))}
 			backLabel="Back to Endpoint"
 			onRetry={loadData}
 		/>
 	{:else if response}
-		<!-- Transaction Details Card -->
+		<!-- Endpoint Details Card -->
 		<Card.Root>
 			<Card.Header>
-				<Card.Title>Transaction Details</Card.Title>
-				<Card.Description>Details of this specific transaction occurrence</Card.Description>
+				<Card.Title>Endpoint Details</Card.Title>
+				<Card.Description>Details of this specific endpoint occurrence</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-6">
 				<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -113,49 +114,49 @@
 					/>
 					<LabelValue
 						label="Status"
-						value={response.transaction.statusCode}
+						value={response.endpoint.statusCode}
 						mono
 						large
-						valueClass={getStatusColor(response.transaction.statusCode)}
+						valueClass={getStatusColor(response.endpoint.statusCode)}
 					/>
 					<LabelValue
 						label="Duration"
-						value={formatDuration(response.transaction.duration)}
+						value={formatDuration(response.endpoint.duration)}
 						mono
 						large
 					/>
 					<LabelValue
 						label="Recorded At"
-						value={formatDateTime(response.transaction.recordedAt, { timezone })}
+						value={formatDateTime(response.endpoint.recordedAt, { timezone })}
 						mono
 					/>
 					<LabelValue
 						label="Server"
-						value={response.transaction.serverName}
+						value={response.endpoint.serverName}
 						mono
 					/>
 					<LabelValue
 						label="Version"
-						value={response.transaction.appVersion}
+						value={response.endpoint.appVersion || '-'}
 						mono
 					/>
 					<LabelValue
 						label="Client IP"
-						value={response.transaction.clientIP}
+						value={response.endpoint.clientIP}
 						mono
 					/>
 					<LabelValue
 						label="Body Size"
-						value={formatBytes(response.transaction.bodySize)}
+						value={formatBytes(response.endpoint.bodySize)}
 						mono
 					/>
 				</div>
 
-				{#if response.transaction.scope && Object.keys(response.transaction.scope).length > 0}
+				{#if response.endpoint.scope && Object.keys(response.endpoint.scope).length > 0}
 					<hr class="border-border" />
 					<div>
 						<p class="mb-3 text-sm font-medium">Context (Scope)</p>
-						<ContextGrid scope={response.transaction.scope} />
+						<ContextGrid scope={response.endpoint.scope} />
 					</div>
 				{/if}
 			</Card.Content>
@@ -169,7 +170,7 @@
 						<TriangleAlert class="h-5 w-5 text-red-500" />
 						<Card.Title class="text-red-600 dark:text-red-400">Exception Occurred</Card.Title>
 					</div>
-					<Card.Description>This transaction resulted in an exception</Card.Description>
+					<Card.Description>This endpoint request resulted in an exception</Card.Description>
 				</Card.Header>
 				<Card.Content>
 					<div class="mb-4 max-h-32 overflow-x-auto rounded-md bg-muted p-3">
@@ -192,15 +193,67 @@
 			</Card.Root>
 		{/if}
 
+		<!-- Messages Section (if messages exist) -->
+		{#if response.messages.length > 0}
+			<Card.Root>
+				<Card.Header>
+					<div class="flex items-center gap-2">
+						<ClipboardList class="h-5 w-5 text-muted-foreground" />
+						<Card.Title>Messages</Card.Title>
+					</div>
+					<Card.Description>
+						{response.messages.length} message{response.messages.length === 1 ? '' : 's'} logged during this request
+					</Card.Description>
+				</Card.Header>
+				<Card.Content class="px-0 pb-0">
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.Head class="pl-6">Message</Table.Head>
+								<Table.Head class="w-[180px]">Recorded At</Table.Head>
+								<Table.Head class="w-[100px] pr-6">Scope</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each response.messages as message}
+								<Table.Row
+									class="cursor-pointer hover:bg-muted/50"
+									onclick={() => goto(`/issues/${message.exceptionHash}/${message.id}`)}
+								>
+									<Table.Cell class="pl-6">
+										<div class="max-w-md truncate font-mono text-sm">
+											{message.stackTrace.split('\n')[0]}
+										</div>
+									</Table.Cell>
+									<Table.Cell class="font-mono text-sm text-muted-foreground">
+										{formatDateTime(message.recordedAt, { timezone })}
+									</Table.Cell>
+									<Table.Cell class="pr-6">
+										{#if message.scope && Object.keys(message.scope).length > 0}
+											<span class="text-xs text-muted-foreground">
+												{Object.keys(message.scope).length} key{Object.keys(message.scope).length === 1 ? '' : 's'}
+											</span>
+										{:else}
+											<span class="text-xs text-muted-foreground">-</span>
+										{/if}
+									</Table.Cell>
+								</Table.Row>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+				</Card.Content>
+			</Card.Root>
+		{/if}
+
 		<!-- Segments Section -->
 		<Card.Root>
 			<Card.Header>
 				<Card.Title>Segments</Card.Title>
 				<Card.Description>
 					{#if response.hasSegments}
-						Timing breakdown of operations within this transaction
+						Timing breakdown of operations within this endpoint request
 					{:else}
-						No segments recorded for this transaction
+						No segments recorded for this endpoint request
 					{/if}
 				</Card.Description>
 			</Card.Header>
@@ -208,8 +261,8 @@
 				{#if response.hasSegments}
 					<SegmentWaterfall
 						segments={response.segments}
-						transactionDuration={response.transaction.duration}
-						transactionStartTime={response.transaction.recordedAt}
+						transactionDuration={response.endpoint.duration}
+						transactionStartTime={response.endpoint.recordedAt}
 					/>
 				{:else}
 					<SegmentEmptyState framework={projectsState.currentProject?.framework ?? 'gin'} />

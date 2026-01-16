@@ -2,14 +2,14 @@ package models
 
 import "time"
 
-type Transaction struct {
+type Endpoint struct {
 	Id        string `json:"id" ch:"id"`
 	ProjectId string `json:"projectId" ch:"project_id"`
 	// endpoint is the route from the router/does not contain actual params so it's safe to group on it
 	Endpoint   string            `json:"endpoint" ch:"endpoint"`
 	Duration   time.Duration     `json:"duration" ch:"duration"`
 	RecordedAt time.Time         `json:"recordedAt" ch:"recorded_at"`
-	StatusCode int32             `json:"statusCode" ch:"status_code"`
+	StatusCode int16             `json:"statusCode" ch:"status_code"`
 	BodySize   int32             `json:"bodySize" ch:"body_size"`
 	ClientIP   string            `json:"clientIP" ch:"client_ip"`
 	Scope      map[string]string `json:"scope" ch:"scope"`

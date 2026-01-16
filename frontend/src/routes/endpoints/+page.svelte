@@ -26,6 +26,12 @@
         getResolvedTimeRange,
         updateUrl
     } from '$lib/utils/url-params';
+    import {
+        getSortState,
+        setSortState,
+        handleSortClick,
+        type SortDirection
+    } from '$lib/utils/sort-storage';
 
     const timezone = $derived(getTimezone());
 
@@ -39,7 +45,6 @@
     };
 
     type SortField = 'count' | 'p50_duration' | 'p95_duration' | 'last_seen' | 'impact';
-    type SortDirection = 'asc' | 'desc';
 
     let endpoints = $state<EndpointStats[]>([]);
     let loading = $state(true);
@@ -47,7 +52,7 @@
 
     // Pagination State
     let page = $state(1);
-    let pageSize = $state(20);
+    let pageSize = $state(100);
     let total = $state(0);
     let totalPages = $state(0);
 
@@ -87,9 +92,11 @@
         loadData(false);
     }
 
-    // Sorting - default to impact descending
-    let orderBy = $state<SortField>('impact');
-    let sortDirection = $state<SortDirection>('desc');
+    // Sorting - persisted to localStorage
+    const SORT_STORAGE_KEY = 'endpoints';
+    const initialSort = getSortState(SORT_STORAGE_KEY, { field: 'impact', direction: 'desc' });
+    let orderBy = $state<SortField>(initialSort.field as SortField);
+    let sortDirection = $state<SortDirection>(initialSort.direction);
 
     // Page size options
     const pageSizeOptions = [
@@ -164,7 +171,7 @@
                 }
             };
 
-            const response = await api.post('/transactions/grouped', requestBody, { projectId: projectsState.currentProjectId ?? undefined });
+            const response = await api.post('/endpoints/grouped', requestBody, { projectId: projectsState.currentProjectId ?? undefined });
 
             endpoints = response.data || [];
             total = response.pagination.total;
@@ -191,16 +198,12 @@
     }
 
     function handleSort(field: SortField) {
-        if (orderBy === field) {
-            // Toggle direction if clicking the same field
-            sortDirection = sortDirection === 'desc' ? 'asc' : 'desc';
-        } else {
-            // New field, default to descending
-            orderBy = field;
-            sortDirection = 'desc';
-        }
+        const newSort = handleSortClick(field, orderBy, sortDirection);
+        orderBy = newSort.field as SortField;
+        sortDirection = newSort.direction;
+        setSortState(SORT_STORAGE_KEY, newSort);
         page = 1;
-        loadData(false); // Don't push to history for sorting
+        loadData(false);
     }
 
     onMount(() => {
@@ -222,7 +225,7 @@
     <!-- Header with Title and Time Range Filter -->
      <div class="flex flex-col gap-4 sm:flex-row sm:justify-between">
 
-        <PageHeader title="Transactions" />
+        <PageHeader title="Endpoints" />
 
         <div class="flex flex-col">
             <TimeRangePicker
@@ -259,7 +262,7 @@
             </Table.Body>
             {:else if endpoints.length === 0}
             <Table.Body>
-                <TableEmptyState colspan={5} message="No transaction data received yet" />
+                <TableEmptyState colspan={5} message="No endpoint data received yet" />
             </Table.Body>
             {:else}
             <Table.Header>
@@ -267,6 +270,7 @@
                     <TracewayTableHeader
                         label="Endpoint"
                         tooltip="The API route or page being accessed"
+                        class="max-w-[50%]"
                     />
                     <TracewayTableHeader
                         label="Calls"
@@ -312,9 +316,9 @@
                     {@const impactLevel = getImpactLevel(endpoint.count, endpoint.p50Duration, endpoint.p95Duration)}
                     <Table.Row
                         class="cursor-pointer hover:bg-muted/50"
-                        onclick={createRowClickHandler(resolve(`/transactions/${encodeURIComponent(endpoint.endpoint)}`), 'preset', 'from', 'to')}
+                        onclick={createRowClickHandler(resolve(`/endpoints/${encodeURIComponent(endpoint.endpoint)}`), 'preset', 'from', 'to')}
                     >
-                        <Table.Cell class="font-mono text-sm">
+                        <Table.Cell class="font-mono text-sm max-w-[50%] break-all whitespace-normal">
                             {endpoint.endpoint}
                         </Table.Cell>
                         <Table.Cell class="tabular-nums">

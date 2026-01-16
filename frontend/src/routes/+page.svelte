@@ -112,7 +112,7 @@
 					<div class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-chart-1/10">
 						<Gauge class="h-5 w-5 text-chart-1" />
 					</div>
-					<h2 class="text-2xl font-bold tracking-tight">Transaction</h2>
+					<h2 class="text-2xl font-bold tracking-tight">Endpoints</h2>
 					<Tooltip.Root>
 						<Tooltip.Trigger class="pt-1">
 							<CircleQuestionMark class="h-4 w-4 text-muted-foreground/60" />
@@ -169,7 +169,7 @@
 									<Table.Row
 										class="cursor-pointer hover:bg-muted/50"
 										onclick={createRowClickHandler(
-											`/transactions/${encodeURIComponent(endpoint.endpoint)}?preset=24h`
+											`/endpoints/${encodeURIComponent(endpoint.endpoint)}?preset=24h`
 										)}
 									>
 										<Table.Cell
@@ -192,7 +192,7 @@
 										</Table.Cell>
 									</Table.Row>
 								{/each}
-								<ViewAllTableRow colspan={5} href="/transactions" label="View all transactions" />
+								<ViewAllTableRow colspan={5} href="/endpoints" label="View all endpoints" />
 							</Table.Body>
 						{:else}
 							<Table.Body>
