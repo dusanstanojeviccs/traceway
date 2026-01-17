@@ -1,3 +1,0 @@
-# This directory holds the frontend build output.
-# During Docker build, frontend files are copied here before the Go binary is built.
-# This file ensures the directory exists for local development.

@@ -8,6 +8,7 @@ import (
 	"backend/app/migrations"
 	"backend/static"
 	"context"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -63,7 +64,7 @@ func main() {
 	})
 
 	// Check if running in API-only mode (no static file serving)
-	apiOnly := os.Getenv("API_ONLY") != ""
+	apiOnly := os.Getenv("API_ONLY") == "true"
 
 	if apiOnly {
 		log.Println("Running in API-only mode, static files disabled")
