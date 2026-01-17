@@ -14,6 +14,7 @@
 	import { api } from '$lib/api';
 	import { ErrorDisplay } from '$lib/components/ui/error-display';
 	import { projectsState } from '$lib/state/projects.svelte';
+	import { setSortState } from '$lib/utils/sort-storage';
 
 	const timezone = $derived(getTimezone());
 
@@ -82,6 +83,9 @@
 		return null;
 	}
 
+	function resetEndpointsSortToImpact() {
+		setSortState('endpoints', { field: 'impact', direction: 'desc' });
+	}
 </script>
 
 <div class="space-y-4">
@@ -192,7 +196,7 @@
 										</Table.Cell>
 									</Table.Row>
 								{/each}
-								<ViewAllTableRow colspan={5} href="/endpoints" label="View all endpoints" />
+								<ViewAllTableRow colspan={5} href="/endpoints" label="View all endpoints" onBeforeNavigate={resetEndpointsSortToImpact} />
 							</Table.Body>
 						{:else}
 							<Table.Body>
